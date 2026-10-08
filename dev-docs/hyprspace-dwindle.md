@@ -124,8 +124,8 @@ It uses Control for these shortcuts:
 | Shrink/grow current split | Control + minus/equal |
 | Toggle fullscreen | Control + F |
 | Toggle floating/tiling | Control + Shift + F |
-| Switch workspace | Control + 1/2 |
-| Send window to workspace | Control + Shift + 1/2 |
+| Switch workspace | Control + 1–9/0 (0 selects workspace 10) |
+| Send window to workspace | Control + Shift + 1–9/0 |
 | Reload this config | Control + Shift + R |
 | Create group / extract current member | Control + G |
 | Next/previous group member | Control + Tab / Control + Shift + Tab |
