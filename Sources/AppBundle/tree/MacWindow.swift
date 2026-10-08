@@ -220,12 +220,25 @@ private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: M
     }
 }
 
-// The function is private because it's unsafe. It leaves the window in unbound state
+// Leaves the window in unbound state until the caller applies the returned binding.
 @MainActor
-private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> BindingData {
+func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> BindingData {
     window?.unbindFromParent() // It's important to unbind to get correct data from below
-    let mruWindow = workspace.mostRecentWindowRecursive
+    let mruWindow = config.enableDwindleTiling
+        ? workspace.rootTilingContainer.mostRecentWindowRecursive
+        : workspace.mostRecentWindowRecursive
     if let mruWindow, let tilingParent = mruWindow.parent as? TilingContainer {
+        if config.enableDwindleTiling && tilingParent.layout == .tiles {
+            let rect = workspace.lastAppliedLayoutPhysicalRect ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+            let orientation = mruWindow.dwindleSplitOrientation(in: rect)
+            let previousBinding = mruWindow.unbindFromParent()
+            let split = TilingContainer(
+                parent: tilingParent, adaptiveWeight: previousBinding.adaptiveWeight,
+                orientation, .tiles, index: previousBinding.index,
+            )
+            mruWindow.bind(to: split, adaptiveWeight: 1, index: 0)
+            return BindingData(parent: split, adaptiveWeight: 1, index: 1)
+        }
         return BindingData(
             parent: tilingParent,
             adaptiveWeight: WEIGHT_AUTO,
@@ -237,6 +250,29 @@ private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, w
             adaptiveWeight: WEIGHT_AUTO,
             index: INDEX_BIND_LAST,
         )
+    }
+}
+
+extension Window {
+    // A newly registered window may not have been laid out yet. Derive its current
+    // tile size from the tree instead of using an old window or ancestor rectangle.
+    @MainActor
+    func dwindleSplitOrientation(in workspaceRect: Rect) -> Orientation {
+        var width = workspaceRect.width
+        var height = workspaceRect.height
+        let path = Array(parentsWithSelf.reversed())
+        for (node, child) in zip(path, path.dropFirst()) {
+            guard let container = node as? TilingContainer, container.layout == .tiles else { continue }
+            let dimension = container.orientation == .h ? width : height
+            let totalWeight = CGFloat(container.children.sumOfDouble { $0.getWeight(container.orientation) })
+            let childDimension = child.getWeight(container.orientation) +
+                (dimension - totalWeight) / CGFloat(container.children.count)
+            switch container.orientation {
+                case .h: width = childDimension
+                case .v: height = childDimension
+            }
+        }
+        return width > height ? .h : .v
     }
 }
 

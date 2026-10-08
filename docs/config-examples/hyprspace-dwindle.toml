@@ -1,0 +1,32 @@
+# Run with: .build/debug/AeroSpaceApp --config-path docs/config-examples/hyprspace-dwindle.toml
+config-version = 2
+start-at-login = false
+enable-dwindle-tiling = true
+default-root-container-layout = 'tiles'
+persistent-workspaces = ['1', '2']
+
+gaps.inner.horizontal = 8
+gaps.inner.vertical = 8
+gaps.outer.left = 8
+gaps.outer.right = 8
+gaps.outer.top = 8
+gaps.outer.bottom = 8
+
+[mode.main.binding]
+ctrl-h = 'focus left'
+ctrl-j = 'focus down'
+ctrl-k = 'focus up'
+ctrl-l = 'focus right'
+ctrl-shift-h = 'move left'
+ctrl-shift-j = 'move down'
+ctrl-shift-k = 'move up'
+ctrl-shift-l = 'move right'
+ctrl-minus = 'resize smart -50'
+ctrl-equal = 'resize smart +50'
+ctrl-f = 'fullscreen'
+ctrl-shift-f = 'layout floating tiling'
+ctrl-1 = 'workspace 1'
+ctrl-2 = 'workspace 2'
+ctrl-shift-1 = 'move-node-to-workspace 1'
+ctrl-shift-2 = 'move-node-to-workspace 2'
+ctrl-shift-r = 'reload-config'

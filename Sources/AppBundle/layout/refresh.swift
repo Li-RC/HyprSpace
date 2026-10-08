@@ -45,6 +45,7 @@ func runHeavyCompleteRefreshSession(
             updateTrayText()
             SecureInputPanel.shared.refresh()
             try await normalizeLayoutReason()
+            normalizeContainers()
             if shouldLayoutWorkspaces { try await layoutWorkspaces() }
         }
     }
