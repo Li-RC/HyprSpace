@@ -94,6 +94,8 @@ struct MessageView: View {
             model.message = nil
         }
         .onAppear {
+            // SwiftUI may present this scene at launch even without diagnostics.
+            guard model.message != nil else { dismiss(); return }
             focus = true
         }
     }
