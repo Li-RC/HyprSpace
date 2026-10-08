@@ -68,7 +68,7 @@ final class WorkspaceStatusController: NSObject {
             self?.dismissIfOutside(at: point)
             return event
         }
-        hosting = NSHostingController(rootView:
+        hosting = NoFocusOutlineHostingController(rootView:
             Overview(workspaces: workspaces, notifications: notifications, placement: placement,
                      close: { [weak self] in self?.panel.dismiss() }, state: overviewState,
                      resized: { [weak self] height in self?.resizeOverview(to: height) },

@@ -2,6 +2,25 @@
 import AppKit
 import SwiftUI
 
+final class NoFocusOutlineHostingController<Content: View>: NSHostingController<Content> {
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        removeFocusRings(in: view)
+    }
+
+    private func removeFocusRings(in view: NSView) {
+        if view.focusRingType != .none { view.focusRingType = .none }
+        for child in view.subviews { removeFocusRings(in: child) }
+    }
+}
+
+struct NoFocusOutline: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 14.0, *) { content.focusEffectDisabled() }
+        else { content }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var notifications: NotificationModel
@@ -66,5 +85,6 @@ struct SettingsView: View {
             }.padding(28).frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem { Label("About", systemImage: "info.circle") }
         }.padding(12).frame(width: 520, height: 360)
+            .modifier(NoFocusOutline())
     }
 }

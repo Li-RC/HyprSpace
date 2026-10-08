@@ -20,7 +20,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "HyprSpace Settings"
         window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: SettingsView(settings: settings, notifications: notifications))
+        window.contentViewController = NoFocusOutlineHostingController(rootView: SettingsView(settings: settings, notifications: notifications))
         super.init(window: window)
         window.delegate = self
         screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,

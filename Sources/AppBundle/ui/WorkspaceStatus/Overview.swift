@@ -202,6 +202,7 @@ struct Overview: View {
             .onChange(of: contentHeight) { height in
                 DispatchQueue.main.async { resized(height) }
             }
+            .modifier(NoFocusOutline())
             .scaleEffect(scale, anchor: .topLeading)
             .frame(width: width * scale, height: canvasHeight * scale, alignment: .topLeading)
     }
