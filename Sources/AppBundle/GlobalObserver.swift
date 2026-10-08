@@ -11,6 +11,9 @@ enum GlobalObserver {
         let notifName = notification.name.rawValue
         Task.startUnstructured { @MainActor in
             if !TrayMenuModel.shared.isEnabled { return }
+            if notifName == NSWorkspace.activeSpaceDidChangeNotification.rawValue {
+                WindowDecorations.shared.hideAll()
+            }
             if notifName == NSWorkspace.didActivateApplicationNotification.rawValue {
                 scheduleCancellableCompleteRefreshSession(.globalObserver(notifName), optimisticallyPreLayoutWorkspaces: true)
             } else {

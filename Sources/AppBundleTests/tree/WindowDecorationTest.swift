@@ -33,3 +33,94 @@ final class WindowDecorationTest: XCTestCase {
         XCTAssertEqual(frame.height, 428)
     }
 }
+
+extension WindowDecorationTest {
+    func testTabHitTestingUsesOnlyBarAndHandlesEdges() {
+        let bounds = NSRect(x: 0, y: 0, width: 300, height: 200)
+        XCTAssertEqual(groupTabIndex(at: CGPoint(x: 0, y: 190), in: bounds, memberCount: 3), 0)
+        XCTAssertEqual(groupTabIndex(at: CGPoint(x: 99, y: 190), in: bounds, memberCount: 3), 0)
+        XCTAssertEqual(groupTabIndex(at: CGPoint(x: 100, y: 190), in: bounds, memberCount: 3), 1)
+        XCTAssertEqual(groupTabIndex(at: CGPoint(x: 299, y: 190), in: bounds, memberCount: 3), 2)
+        XCTAssertNil(groupTabIndex(at: CGPoint(x: -1, y: 190), in: bounds, memberCount: 3))
+        XCTAssertNil(groupTabIndex(at: CGPoint(x: 301, y: 190), in: bounds, memberCount: 3))
+        XCTAssertNil(groupTabIndex(at: CGPoint(x: 150, y: 100), in: bounds, memberCount: 3))
+        XCTAssertNil(groupTabIndex(at: CGPoint(x: 150, y: 190), in: bounds, memberCount: 0))
+        XCTAssertNil(groupTabIndex(at: .zero, in: .zero, memberCount: 3))
+    }
+
+    @MainActor func testSelectingTabSwitchesActiveMemberAndFocus() {
+        setUpWorkspacesForTests()
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        XCTAssertTrue(first.isInactiveGroupMember)
+        XCTAssertTrue(selectGroupTab(windowId: first.windowId, in: group))
+        XCTAssertEqual(focus.windowOrNil, first)
+        XCTAssertEqual(group.mostRecentWindowRecursive, first)
+        XCTAssertTrue(second.isInactiveGroupMember)
+        XCTAssertTrue(selectGroupTab(windowId: second.windowId, in: group))
+        XCTAssertEqual(focus.windowOrNil, second)
+    }
+
+    @MainActor func testStaleTabDoesNotFocusWindowOutsideGroup() {
+        setUpWorkspacesForTests()
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        XCTAssertTrue(second.focusWindow())
+        first.removeFromWindowGroup()
+        XCTAssertFalse(selectGroupTab(windowId: first.windowId, in: group))
+        XCTAssertFalse(selectGroupTab(windowId: 999, in: group))
+        XCTAssertEqual(focus.windowOrNil, second)
+        group.isWindowGroup = false
+        XCTAssertFalse(selectGroupTab(windowId: second.windowId, in: group))
+    }
+}
+
+
+extension WindowDecorationTest {
+    @MainActor func testDecorationPanelsHideInExposeAndDoNotJoinFullscreenSpaces() {
+        let panel = DecorationPanel()
+        XCTAssertTrue(panel.collectionBehavior.contains(.transient))
+        XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenNone))
+        XCTAssertFalse(panel.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertFalse(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+        panel.close()
+    }
+
+    func testDecorationOwnersExcludeHiddenAndOtherSpaceWindows() {
+        let owners = onScreenDecorationOwners([
+            [kCGWindowNumber as String: NSNumber(value: 1), kCGWindowIsOnscreen as String: true],
+            [kCGWindowNumber as String: NSNumber(value: 2), kCGWindowIsOnscreen as String: false],
+            [kCGWindowNumber as String: NSNumber(value: 3)],
+        ])
+        XCTAssertEqual(owners, [1])
+        XCTAssertTrue(onScreenDecorationOwners([]).isEmpty)
+    }
+}
+
+
+extension WindowDecorationTest {
+    @MainActor func testBorderAndBarFollowNativeDragAndResizeFrames() {
+        let border = DecorationPanel()
+        let bar = DecorationPanel()
+        defer { border.close(); bar.close() }
+        let frames = [
+            Rect(topLeftX: 100, topLeftY: 80, width: 800, height: 600),
+            Rect(topLeftX: 260, topLeftY: 150, width: 800, height: 600),
+            Rect(topLeftX: 260, topLeftY: 150, width: 1000, height: 700),
+            Rect(topLeftX: -900, topLeftY: -250, width: 500, height: 400),
+        ]
+        for rect in frames {
+            border.followOwner(rect, primaryScreenHeight: 1080, borderWidth: 2, isGroupBar: false)
+            bar.followOwner(rect, primaryScreenHeight: 1080, borderWidth: 0, isGroupBar: true)
+            XCTAssertEqual(border.frame, decorationFrame(rect, primaryScreenHeight: 1080, borderWidth: 2, barHeight: 0))
+            XCTAssertEqual(bar.frame.minX, rect.minX)
+            XCTAssertEqual(bar.frame.minY, 1080 - rect.minY)
+            XCTAssertEqual(bar.frame.width, rect.width)
+            XCTAssertEqual(bar.frame.height, windowGroupBarHeight)
+        }
+    }
+}

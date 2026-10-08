@@ -25,4 +25,11 @@
 // func _AXUIElementGetWindow(_ axUiElement: AXUIElement, _ id: inout CGWindowID) -> AXError
 AXError _AXUIElementGetWindow(AXUIElementRef element, uint32_t *identifier);
 
+// Keep cross-process decorations at their owner's level and sublevel.
+bool HyprspaceOrderDecorationAboveWindow(uint32_t decoration, uint32_t owner);
+
+CGRect HyprspaceDecorationOwnerBounds(uint32_t owner);
+bool HyprspaceObserveDecorationWindows(const uint32_t *windows, int count,
+                                      void (*handler)(uint32_t window, uint32_t event));
+
 #endif

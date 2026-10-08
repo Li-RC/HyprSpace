@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import PrivateApi
 
 let windowGroupBarHeight: CGFloat = 24
 
@@ -13,6 +14,22 @@ final class DecorationPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
+    func followOwner(_ rect: Rect, primaryScreenHeight: CGFloat, borderWidth: CGFloat, isGroupBar: Bool) {
+        let frame = isGroupBar
+            ? NSRect(x: rect.minX, y: primaryScreenHeight - rect.minY, width: rect.width, height: windowGroupBarHeight)
+            : decorationFrame(rect, primaryScreenHeight: primaryScreenHeight, borderWidth: borderWidth, barHeight: 0)
+        setFrame(frame, display: true)
+    }
+
+    func orderAboveOwner(_ owner: UInt32) {
+        order(.above, relativeTo: Int(owner))
+        // AppKit can assign panels sublevel 20 even at NSWindow.Level.normal.
+        // Match the foreign owner's sublevel before applying relative ordering.
+        if !HyprspaceOrderDecorationAboveWindow(UInt32(windowNumber), owner) {
+            orderOut(nil)
+        }
+    }
+
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isReleasedWhenClosed = false
@@ -25,6 +42,19 @@ final class DecorationPanel: NSPanel {
         level = .normal
         contentView = DecorationView()
     }
+}
+
+func nativeDecorationOwnerRect(_ windowId: UInt32) -> Rect? {
+    let bounds = HyprspaceDecorationOwnerBounds(windowId)
+    guard !bounds.isNull else { return nil }
+    return Rect(topLeftX: bounds.minX, topLeftY: bounds.minY, width: bounds.width, height: bounds.height)
+}
+
+func onScreenDecorationOwners(_ windowInfo: [[String: Any]]) -> Set<UInt32> {
+    Set(windowInfo.compactMap { info in
+        guard (info[kCGWindowIsOnscreen as String] as? Bool) == true else { return nil }
+        return (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value
+    })
 }
 
 func groupTabIndex(at point: CGPoint, in bounds: NSRect, memberCount: Int) -> Int? {
@@ -103,23 +133,70 @@ final class WindowDecorations {
     static let shared = WindowDecorations()
     private var panels: [UInt32: DecorationPanel] = [:]
     private var bars: [UInt32: DecorationPanel] = [:]
+    private var observedOwners: Set<UInt32> = []
+    private var ownerFrames: [UInt32: Rect] = [:]
+
+    private func updateObservedOwners(_ owners: Set<UInt32>) {
+        guard owners != observedOwners else { return }
+        let ids = Array(owners)
+        let subscribed = ids.withUnsafeBufferPointer { buffer in
+            unsafe HyprspaceObserveDecorationWindows(buffer.baseAddress, Int32(buffer.count)) { windowId, event in
+                MainActor.assumeIsolated {
+                    WindowDecorations.shared.ownerChanged(windowId: windowId, event: event)
+                }
+            }
+        }
+        if subscribed { observedOwners = owners }
+    }
+
+    func ownerChanged(windowId: UInt32, event: UInt32) {
+        guard observedOwners.contains(windowId) else { return }
+        if event == 804 || event == 816 {
+            panels.removeValue(forKey: windowId)?.close()
+            bars.removeValue(forKey: windowId)?.close()
+            ownerFrames.removeValue(forKey: windowId)
+            updateObservedOwners(observedOwners.subtracting([windowId]))
+            return
+        }
+        guard let rect = nativeDecorationOwnerRect(windowId) else { return }
+        ownerFrames[windowId] = rect
+        if let panel = panels[windowId] {
+            panel.followOwner(rect, primaryScreenHeight: mainMonitorInfo.height,
+                              borderWidth: CGFloat(config.windowBorders.width), isGroupBar: false)
+        }
+        if let bar = bars[windowId] {
+            bar.followOwner(rect, primaryScreenHeight: mainMonitorInfo.height, borderWidth: 0, isGroupBar: true)
+        }
+    }
+
     func hideAll() {
         panels.values.forEach { $0.close() }
         panels.removeAll()
         bars.values.forEach { $0.close() }
         bars.removeAll()
+        ownerFrames.removeAll()
+        updateObservedOwners([])
     }
 
     func refresh() {
         if isUnitTest { return }
         guard TrayMenuModel.shared.isEnabled else { hideAll(); return }
+        // A HyprSpace workspace can remain visible in our model while macOS
+        // switches to a native fullscreen Space. Consult WindowServer as well.
+        let onScreenOwners = onScreenDecorationOwners(
+            CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], 0) as? [[String: Any]] ?? [],
+        )
         var visibleIds: Set<UInt32> = []
         var visibleBars: Set<UInt32> = []
+        var trackingOwners: Set<UInt32> = []
         for workspace in Workspace.all where workspace.isVisible {
             for window in workspace.allLeafWindowsRecursive {
-                guard                       window.isFloating || window.parent is TilingContainer,
+                guard onScreenOwners.contains(window.windowId),
+                      window.isFloating || window.parent is TilingContainer,
                       !window.isInactiveGroupMember, !window.isFullscreen,
-                      let rect = window.lastAppliedLayoutPhysicalRect else { continue }
+                      let rect = nativeDecorationOwnerRect(window.windowId) else { continue }
+                trackingOwners.insert(window.windowId)
+                ownerFrames[window.windowId] = rect
                 guard window.lastAppliedLayoutPhysicalRect != nil || currentlyManipulatedWithMouseWindowId == window.windowId else { continue }
                 let color = (focus.windowOrNil == window ? config.windowBorders.activeColor : config.windowBorders.inactiveColor).nsColor
                 let frame = decorationFrame(rect, primaryScreenHeight: mainMonitorInfo.height,
@@ -133,7 +210,7 @@ final class WindowDecorations {
                     view.color = color
                     panel.setFrame(frame, display: false)
                     view.needsDisplay = true
-                    panel.order(.above, relativeTo: Int(window.windowId))
+                    panel.orderAboveOwner(window.windowId)
                 }
                 if let group = window.windowGroup {
                     visibleBars.insert(window.windowId)
@@ -153,11 +230,13 @@ final class WindowDecorations {
                     bar.setFrame(NSRect(x: rect.minX, y: mainMonitorInfo.height - rect.minY,
                                         width: rect.width, height: windowGroupBarHeight), display: false)
                     view.needsDisplay = true
-                    bar.order(.above, relativeTo: Int(window.windowId))
+                    bar.orderAboveOwner(window.windowId)
                 }
             }
         }
         for id in Array(panels.keys) where !visibleIds.contains(id) { panels.removeValue(forKey: id)?.close() }
         for id in Array(bars.keys) where !visibleBars.contains(id) { bars.removeValue(forKey: id)?.close() }
+        ownerFrames = ownerFrames.filter { trackingOwners.contains($0.key) }
+        updateObservedOwners(trackingOwners)
     }
 }
