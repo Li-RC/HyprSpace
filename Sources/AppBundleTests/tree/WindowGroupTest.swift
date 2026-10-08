@@ -170,6 +170,22 @@ final class WindowGroupTest: XCTestCase {
         XCTAssertEqual(second.nodeWorkspace, destination)
     }
 
+    func testDirectionalMoveMovesWholeGroup() async {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let active = TestWindow.new(id: 3, parent: group)
+        XCTAssertTrue(active.focusWindow())
+        let result = await parseCommand("move right").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode.rawValue, 0)
+        workspace.normalizeContainers()
+        XCTAssertEqual(active.windowGroup, group)
+        XCTAssertTrue(group.isWindowGroup)
+        XCTAssertEqual(group.children, [first, active])
+        XCTAssertEqual(workspace.rootTilingContainer.children.last, group)
+    }
+
     func testFullscreenGroupMemberUsesWholeMonitorWithoutBar() async throws {
         let workspace = Workspace.get(byName: name)
         let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
