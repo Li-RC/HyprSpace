@@ -16,8 +16,8 @@ aerospace group [-h|--help] [--window-id <window-id>] (toggle|next|prev|remove|j
 // tag::body[]
 A group occupies one tile and displays its most recently focused member.
 The group bar lists members in order. Click a tab or use keyboard commands to
-select its member. Drag a tab within the bar to reorder members without changing
-the active window. Releasing outside the bar cancels the reorder.
+select its member. Drag a tab within the bar to reorder members live without changing
+the active window. Releasing outside the bar restores the original order.
 Only the bar receives clicks; borders remain click-through.
 
 `toggle` creates a group around the target tiled window, or extracts only that window

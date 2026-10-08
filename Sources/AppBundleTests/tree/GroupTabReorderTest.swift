@@ -88,7 +88,7 @@ final class GroupTabReorderTest: XCTestCase {
 
     func testDragThresholdAndOutsideReleaseKeepClicksDistinctFromReorders() {
         let bounds = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
-        var drag = GroupTabDrag(windowId: 1, origin: CGPoint(x: 50, y: 16))
+        var drag = GroupTabDrag(windowId: 1, origin: CGPoint(x: 50, y: 16), originalIndex: 0)
         drag.update(at: CGPoint(x: 52, y: 17), in: bounds, memberCount: 3)
         XCTAssertFalse(drag.isDragging)
         XCTAssertNil(drag.targetIndex)
@@ -102,4 +102,51 @@ final class GroupTabReorderTest: XCTestCase {
         XCTAssertTrue(drag.isDragging)
         XCTAssertEqual(drag.targetIndex, 0)
     }
+
+    func testDraggingUpdatesTreeAndDisplayedOrderBeforeRelease() {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        let third = TestWindow.new(id: 3, parent: group)
+        XCTAssertTrue(second.focusWindow())
+        let history = Array(group.mruChildren)
+        let view = DecorationView()
+        let bounds = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
+        var drag = GroupTabDrag(windowId: first.windowId, origin: CGPoint(x: 50, y: 16), originalIndex: 0)
+        for (x, expected) in [(150.0, [second, first, third]), (250.0, [second, third, first]), (50.0, [first, second, third])] {
+            drag.update(at: CGPoint(x: x, y: 16), in: bounds, memberCount: 3)
+            XCTAssertTrue(drag.apply(in: group))
+            view.updateGroup(group)
+            XCTAssertEqual(group.children, expected)
+            XCTAssertEqual(view.memberIds, expected.map(\.windowId))
+            XCTAssertEqual(view.activeIndex, second.ownIndex)
+            XCTAssertEqual(focus.windowOrNil, second)
+            XCTAssertEqual(Array(group.mruChildren), history)
+        }
+    }
+
+    func testOutsideReleaseRestoresOriginalOrderAfterLiveReordering() {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        let third = TestWindow.new(id: 3, parent: group)
+        XCTAssertTrue(third.focusWindow())
+        let bounds = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
+        var drag = GroupTabDrag(windowId: second.windowId, origin: CGPoint(x: 150, y: 16), originalIndex: 1)
+        drag.update(at: CGPoint(x: 250, y: 16), in: bounds, memberCount: 3)
+        XCTAssertTrue(drag.apply(in: group))
+        XCTAssertEqual(group.children, [first, third, second])
+        drag.update(at: CGPoint(x: 250, y: -10), in: bounds, memberCount: 3)
+        XCTAssertFalse(drag.apply(in: group))
+        XCTAssertTrue(drag.cancel(in: group))
+        XCTAssertEqual(group.children, [first, second, third])
+        XCTAssertEqual(focus.windowOrNil, third)
+        third.unbindFromParent()
+        second.unbindFromParent()
+        XCTAssertFalse(drag.cancel(in: group))
+        XCTAssertEqual(group.children, [first])
+    }
+
 }
