@@ -37,7 +37,9 @@ that group while it is the tiled insertion target. Only the active member is
 shown; other members use AeroSpace's existing offscreen hiding mechanism.
 The bar shows application names on a native Liquid Glass background on macOS 26 and later (material on older macOS),
 with an 8-point gap above the window. Click a tab to switch to that member, or
-cycle members with the keyboard.
+cycle members with the keyboard. Drag a tab across another tab and release to
+reorder the members; an insertion marker shows the destination. The active window
+stays selected, and releasing outside the bar cancels the reorder.
 
 `group next` and `group prev` wrap through members. `group join-right` (or another
 direction) joins a neighbor; if both tiles are groups, it merges their members.

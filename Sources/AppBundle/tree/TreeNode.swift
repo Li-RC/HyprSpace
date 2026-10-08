@@ -66,6 +66,21 @@ open class TreeNode: Equatable, AeroAny {
 
     @MainActor
     @discardableResult
+    func reorderWindowGroupMember(_ windowId: UInt32, to index: Int) -> Bool {
+        guard let group = self as? TilingContainer, group.isBound, group.isWindowGroup,
+              _children.indices.contains(index),
+              let source = _children.firstIndex(where: { ($0 as? Window)?.windowId == windowId }) else { return false }
+        if source == index { return true }
+        resetClosedWindowsCache()
+        // Change display order without rebinding: membership, weights, and the
+        // entire focus history must survive dragging an inactive tab.
+        let member = _children.remove(at: source)
+        _children.insert(member, at: index)
+        return true
+    }
+
+    @MainActor
+    @discardableResult
     func bind(to newParent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) -> BindingData? {
         let result = unbindIfBound()
 

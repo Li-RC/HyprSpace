@@ -116,6 +116,18 @@ final class GroupBarView: NSView {
     }
 }
 
+struct GroupTabDrag {
+    let windowId: UInt32
+    let origin: CGPoint
+    var isDragging = false
+    var targetIndex: Int?
+
+    mutating func update(at point: CGPoint, in bounds: NSRect, memberCount: Int) {
+        if max(abs(point.x - origin.x), abs(point.y - origin.y)) >= 4 { isDragging = true }
+        targetIndex = isDragging ? groupTabIndex(at: point, in: bounds, memberCount: memberCount) : nil
+    }
+}
+
 final class DecorationView: NSView {
     var borderWidth: CGFloat = 0
     var color: NSColor = .clear
@@ -123,20 +135,40 @@ final class DecorationView: NSView {
     var activeIndex: Int = 0
     var memberIds: [UInt32] = []
     weak var group: TilingContainer?
+    private var tabDrag: GroupTabDrag?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    override func mouseDown(with event: NSEvent) {} // Keep keyboard focus in the member window.
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard event.buttonNumber == 0,
+              let index = groupTabIndex(at: point, in: bounds, memberCount: memberIds.count) else { return }
+        // Keep keyboard focus in the member window until a click is completed.
+        tabDrag = GroupTabDrag(windowId: memberIds[index], origin: point)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard var drag = tabDrag else { return }
+        drag.update(at: convert(event.locationInWindow, from: nil), in: bounds, memberCount: memberIds.count)
+        tabDrag = drag
+        needsDisplay = true
+    }
 
     override func mouseUp(with event: NSEvent) {
-        guard event.buttonNumber == 0, let group,
-              let index = groupTabIndex(at: convert(event.locationInWindow, from: nil), in: bounds, memberCount: memberIds.count)
-        else { return }
-        let windowId = memberIds[index]
+        defer { tabDrag = nil; needsDisplay = true }
+        guard event.buttonNumber == 0, let group, var drag = tabDrag else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        drag.update(at: point, in: bounds, memberCount: memberIds.count)
+        guard let index = groupTabIndex(at: point, in: bounds, memberCount: memberIds.count),
+              drag.isDragging || memberIds[index] == drag.windowId else { return }
         Task.startUnstructured { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.groupBar, token) {
-                _ = selectGroupTab(windowId: windowId, in: group)
+                if drag.isDragging {
+                    _ = group.reorderWindowGroupMember(drag.windowId, to: index)
+                } else {
+                    _ = selectGroupTab(windowId: drag.windowId, in: group)
+                }
             }
         }
     }
@@ -202,6 +234,17 @@ final class DecorationView: NSView {
             (title as NSString).draw(in: NSRect(x: tab.midX - textWidth / 2, y: tab.midY - textSize.height / 2,
                                                width: textWidth, height: textSize.height),
                                     withAttributes: attributes)
+        }
+        if let drag = tabDrag, drag.isDragging, let target = drag.targetIndex,
+           let source = memberIds.firstIndex(of: drag.windowId), target != source {
+            let edge = target > source ? target + 1 : target
+            let x = min(bounds.maxX - 5, max(bounds.minX + 5, bounds.minX + CGFloat(edge) * tabWidth))
+            let marker = NSBezierPath()
+            marker.move(to: CGPoint(x: x, y: bounds.minY + 6))
+            marker.line(to: CGPoint(x: x, y: bounds.maxY - 6))
+            marker.lineWidth = 2
+            NSColor.controlAccentColor.setStroke()
+            marker.stroke()
         }
     }
 }
