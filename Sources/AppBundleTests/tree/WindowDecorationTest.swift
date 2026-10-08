@@ -118,7 +118,8 @@ extension WindowDecorationTest {
             bar.followOwner(rect, primaryScreenHeight: 1080, borderWidth: 0, isGroupBar: true)
             XCTAssertEqual(border.frame, decorationFrame(rect, primaryScreenHeight: 1080, borderWidth: 2, barHeight: 0))
             XCTAssertEqual(bar.frame.minX, rect.minX)
-            XCTAssertEqual(bar.frame.minY, 1080 - rect.minY)
+            XCTAssertEqual(bar.frame.minY, 1080 - rect.minY + windowGroupBarGap)
+            XCTAssertEqual(bar.frame.minY - (1080 - rect.minY), 8)
             XCTAssertEqual(bar.frame.width, rect.width)
             XCTAssertEqual(bar.frame.height, windowGroupBarHeight)
         }

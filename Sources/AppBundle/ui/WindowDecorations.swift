@@ -2,12 +2,18 @@ import AppKit
 import Common
 import PrivateApi
 
-let windowGroupBarHeight: CGFloat = 24
+let windowGroupBarHeight: CGFloat = 32
+let windowGroupBarGap: CGFloat = 8
 
 // Accessibility uses a top-left origin; AppKit uses a bottom-left origin.
 func decorationFrame(_ rect: Rect, primaryScreenHeight: CGFloat, borderWidth: CGFloat, barHeight: CGFloat) -> NSRect {
     NSRect(x: rect.minX - borderWidth, y: primaryScreenHeight - rect.maxY - borderWidth,
            width: rect.width + borderWidth * 2, height: rect.height + borderWidth * 2 + barHeight)
+}
+
+func groupBarFrame(_ rect: Rect, primaryScreenHeight: CGFloat) -> NSRect {
+    NSRect(x: rect.minX, y: primaryScreenHeight - rect.minY + windowGroupBarGap,
+           width: rect.width, height: windowGroupBarHeight)
 }
 
 final class DecorationPanel: NSPanel {
@@ -16,7 +22,7 @@ final class DecorationPanel: NSPanel {
 
     func followOwner(_ rect: Rect, primaryScreenHeight: CGFloat, borderWidth: CGFloat, isGroupBar: Bool) {
         let frame = isGroupBar
-            ? NSRect(x: rect.minX, y: primaryScreenHeight - rect.minY, width: rect.width, height: windowGroupBarHeight)
+            ? groupBarFrame(rect, primaryScreenHeight: primaryScreenHeight)
             : decorationFrame(rect, primaryScreenHeight: primaryScreenHeight, borderWidth: borderWidth, barHeight: 0)
         setFrame(frame, display: true)
     }
@@ -70,6 +76,46 @@ func selectGroupTab(windowId: UInt32, in group: TilingContainer) -> Bool {
     return window.focusWindow()
 }
 
+final class GroupBarView: NSView {
+    let tabs = DecorationView()
+    let background: NSView
+
+    init() {
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.style = .regular
+            glass.cornerRadius = windowGroupBarHeight / 2
+            if #available(macOS 27.0, *) { glass.effectIsInteractive = true }
+            background = glass
+        } else {
+            let material = NSVisualEffectView()
+            material.material = .popover
+            material.blendingMode = .behindWindow
+            material.wantsLayer = true
+            material.layer?.cornerRadius = windowGroupBarHeight / 2
+            material.layer?.masksToBounds = true
+            background = material
+        }
+        super.init(frame: .zero)
+        background.autoresizingMask = [.width, .height]
+        tabs.autoresizingMask = [.width, .height]
+        addSubview(background)
+        if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView {
+            glass.contentView = tabs
+        } else {
+            background.addSubview(tabs)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layout() {
+        super.layout()
+        background.frame = bounds
+        tabs.frame = background.bounds
+    }
+}
+
 final class DecorationView: NSView {
     var borderWidth: CGFloat = 0
     var color: NSColor = .clear
@@ -98,9 +144,12 @@ final class DecorationView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         bounds.fill(using: .copy)
-        let barHeight = members.isEmpty ? 0 : windowGroupBarHeight
+        if !members.isEmpty {
+            drawGroupTabs()
+            return
+        }
         let body = NSRect(x: borderWidth / 2, y: borderWidth / 2,
-                          width: bounds.width - borderWidth, height: bounds.height - barHeight - borderWidth)
+                          width: bounds.width - borderWidth, height: bounds.height - borderWidth)
         if borderWidth > 0 {
             color.setStroke()
             // AppKit on macOS 27 resolves standard window corners to 16 points.
@@ -111,19 +160,48 @@ final class DecorationView: NSView {
             outline.lineWidth = borderWidth
             outline.stroke()
         }
-        guard !members.isEmpty else { return }
+    }
+
+    private func drawGroupTabs() {
         let tabWidth = bounds.width / CGFloat(members.count)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
         for (index, title) in members.enumerated() {
-            let tab = NSRect(x: CGFloat(index) * tabWidth, y: bounds.height - barHeight, width: tabWidth, height: barHeight)
-            (index == activeIndex ? color : NSColor(srgbRed: 0.12, green: 0.13, blue: 0.18, alpha: 1)).setFill()
-            tab.fill()
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineBreakMode = .byTruncatingTail
-            paragraph.alignment = .center
-            let textColor: NSColor = .white
-            (title as NSString).draw(in: tab.insetBy(dx: 5, dy: 4), withAttributes: [
-                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: textColor, .paragraphStyle: paragraph,
-            ])
+            let tab = NSRect(x: bounds.minX + CGFloat(index) * tabWidth, y: bounds.maxY - windowGroupBarHeight,
+                             width: tabWidth, height: windowGroupBarHeight).insetBy(dx: 4, dy: 4)
+            guard tab.width > 0 else { continue }
+            let selected = index == activeIndex
+            if selected {
+                let pill = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
+                NSGraphicsContext.saveGraphicsState()
+                let shadow = NSShadow()
+                shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
+                shadow.shadowBlurRadius = 2
+                shadow.shadowOffset = NSSize(width: 0, height: -1)
+                shadow.set()
+                NSColor.windowBackgroundColor.withAlphaComponent(0.85).setFill()
+                pill.fill()
+                NSGraphicsContext.restoreGraphicsState()
+                NSColor.labelColor.withAlphaComponent(0.10).setStroke()
+                pill.lineWidth = 0.5
+                pill.stroke()
+            } else if index > 0 && index - 1 != activeIndex {
+                NSColor.labelColor.withAlphaComponent(0.12).setStroke()
+                let divider = NSBezierPath()
+                divider.move(to: CGPoint(x: tab.minX - 4, y: tab.minY + 4))
+                divider.line(to: CGPoint(x: tab.minX - 4, y: tab.maxY - 4))
+                divider.lineWidth = 0.5
+                divider.stroke()
+            }
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 13, weight: selected ? .medium : .regular),
+                .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph,
+            ]
+            let textSize = (title as NSString).size(withAttributes: attributes)
+            let textWidth = min(textSize.width, max(0, tab.width - 16))
+            (title as NSString).draw(in: NSRect(x: tab.midX - textWidth / 2, y: tab.midY - textSize.height / 2,
+                                               width: textWidth, height: textSize.height),
+                                    withAttributes: attributes)
         }
     }
 }
@@ -226,21 +304,27 @@ final class WindowDecorations {
                 }
                 if let group = window.windowGroup {
                     visibleBars.insert(window.windowId)
-                    let bar = bars[window.windowId] ?? DecorationPanel()
-                    bars[window.windowId] = bar
+                    let bar: DecorationPanel
+                    if let existing = bars[window.windowId] {
+                        bar = existing
+                    } else {
+                        bar = DecorationPanel()
+                        bar.contentView = GroupBarView()
+                        bars[window.windowId] = bar
+                    }
                     // Only this narrow panel receives mouse events. The outline panel
                     // remains click-through, including the member's entire content area.
                     bar.ignoresMouseEvents = false
-                    let view = bar.contentView as! DecorationView
-                    view.group = group
-                    view.color = color
-                    view.members = group.children.enumerated().map { index, member in
-                        "\(index + 1): \((member as! Window).app.name ?? "Window")"
+                    let material = bar.contentView as! GroupBarView
+                    if let fallback = material.background as? NSVisualEffectView {
+                        fallback.state = focus.windowOrNil?.windowGroup === group ? .active : .inactive
                     }
+                    let view = material.tabs
+                    view.group = group
+                    view.members = group.allLeafWindowsRecursive.map { $0.app.name ?? "Window" }
                     view.memberIds = group.allLeafWindowsRecursive.map(\.windowId)
                     view.activeIndex = window.ownIndex ?? 0
-                    bar.setFrame(NSRect(x: rect.minX, y: mainMonitorInfo.height - rect.minY,
-                                        width: rect.width, height: windowGroupBarHeight), display: false)
+                    bar.setFrame(groupBarFrame(rect, primaryScreenHeight: mainMonitorInfo.height), display: false)
                     view.needsDisplay = true
                     bar.orderAboveOwner(window.windowId)
                 }

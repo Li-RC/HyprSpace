@@ -147,7 +147,7 @@ final class WindowGroupTest: XCTestCase {
         XCTAssertEqual(first.appliedFrames, 0)
         XCTAssertEqual(second.appliedFrames, 1)
         XCTAssertNil(first.lastAppliedLayoutPhysicalRect)
-        XCTAssertEqual(second.lastAppliedLayoutPhysicalRect!.minY, group.lastAppliedLayoutPhysicalRect!.minY + windowGroupBarHeight)
+        XCTAssertEqual(second.lastAppliedLayoutPhysicalRect!.minY, group.lastAppliedLayoutPhysicalRect!.minY + windowGroupBarHeight + windowGroupBarGap)
         XCTAssertTrue(first.focusWindow())
         try await workspace.layoutWorkspace()
         XCTAssertEqual(first.appliedFrames, 1)

@@ -50,7 +50,7 @@ extension TreeNode {
                     }
                     if let active = container.mostRecentWindowRecursive {
                         let fullscreen = active.isFullscreen && active == context.workspace.rootTilingContainer.mostRecentWindowRecursive
-                        let barHeight = fullscreen ? 0 : min(windowGroupBarHeight, height)
+                        let barHeight = fullscreen ? 0 : min(windowGroupBarHeight + windowGroupBarGap, height)
                         try await active.layoutRecursive(point.addingYOffset(barHeight), width: width, height: height - barHeight, virtual: virtual, context)
                     }
                     return

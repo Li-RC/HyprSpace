@@ -106,9 +106,9 @@ final class DragToGroupTest: XCTestCase {
             let tile = group.lastAppliedLayoutPhysicalRect!
             let rect = selected.lastAppliedLayoutPhysicalRect!
             XCTAssertEqual(rect.minX, tile.minX)
-            XCTAssertEqual(rect.minY, tile.minY + windowGroupBarHeight)
+            XCTAssertEqual(rect.minY, tile.minY + windowGroupBarHeight + windowGroupBarGap)
             XCTAssertEqual(rect.width, tile.width)
-            XCTAssertEqual(rect.height, tile.height - windowGroupBarHeight)
+            XCTAssertEqual(rect.height, tile.height - windowGroupBarHeight - windowGroupBarGap)
             let hidden = selected == first ? active : first
             XCTAssertNil(hidden.lastAppliedLayoutPhysicalRect)
             XCTAssertNil(hidden.lastAppliedLayoutVirtualRect)
