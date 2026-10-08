@@ -56,14 +56,26 @@ enum GlobalObserver {
         nc.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main, using: onNotif)
         nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: onNotif)
 
+        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { _ in
+            // AppKit delivers global mouse monitors on the main thread. Record
+            // the drag without waiting for an AX refresh or task scheduling.
+            MainActor.assumeIsolated {
+                guard TrayMenuModel.shared.isEnabled, config.enableDwindleTiling,
+                      let window = focus.windowOrNil else { return }
+                WindowDecorations.shared.captureMouseDrag(windowId: window.windowId)
+                updateDwindleDragPreview(at: mouseLocation)
+            }
+        }
+
         NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
+            let releasePoint = mouseLocation
             // todo reduce number of refreshSession in the callback
             //  resetManipulatedWithMouseIfPossible might call its own refreshSession
             //  The end of the callback calls refreshSession
             Task.startUnstructured { @MainActor in
                 guard let token: RunSessionGuard = .isServerEnabled else { return }
-                try await resetManipulatedWithMouseIfPossible()
-                let mouseLocation = mouseLocation
+                try await resetManipulatedWithMouseIfPossible(at: releasePoint)
+                let mouseLocation = releasePoint
                 let clickedMonitor = mouseLocation.monitorApproximation
                 switch true {
                     // Detect clicks on desktop of different monitors

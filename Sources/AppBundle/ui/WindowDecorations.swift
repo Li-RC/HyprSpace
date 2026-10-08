@@ -149,6 +149,13 @@ final class WindowDecorations {
         if subscribed { observedOwners = owners }
     }
 
+    func captureMouseDrag(windowId: UInt32) {
+        guard observedOwners.contains(windowId), let previous = ownerFrames[windowId],
+              let rect = nativeDecorationOwnerRect(windowId), let window = Window.get(byId: windowId),
+              focus.windowOrNil == window || window.app.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
+        recordDwindleMouseMove(window, from: previous, to: rect, mouseButtonDown: isLeftMouseButtonDown)
+    }
+
     func ownerChanged(windowId: UInt32, event: UInt32) {
         guard observedOwners.contains(windowId) else { return }
         if event == 804 || event == 816 {
@@ -159,6 +166,10 @@ final class WindowDecorations {
             return
         }
         guard let rect = nativeDecorationOwnerRect(windowId) else { return }
+        if event == 806 {
+            captureMouseDrag(windowId: windowId)
+            if config.enableDwindleTiling { updateDwindleDragPreview(at: mouseLocation) }
+        }
         ownerFrames[windowId] = rect
         if let panel = panels[windowId] {
             panel.followOwner(rect, primaryScreenHeight: mainMonitorInfo.height,
@@ -170,6 +181,7 @@ final class WindowDecorations {
     }
 
     func hideAll() {
+        DwindleDropPreview.shared.hide()
         panels.values.forEach { $0.close() }
         panels.removeAll()
         bars.values.forEach { $0.close() }
