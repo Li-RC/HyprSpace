@@ -409,12 +409,13 @@ private func getAxRect(window: AXUIElement, job: RunLoopJob) throws -> Rect? {
 }
 
 private func setFrame(_ window: AXUIElement, _ topLeft: CGPoint?, _ size: CGSize?, _ job: RunLoopJob) throws {
+    // Finish a started frame update: cancelling between size and position can leave
+    // a newly active group member resized but still at its hidden corner.
+    try job.checkCancellation()
     // Set size and then the position. The order is important https://github.com/nikitabobko/AeroSpace/issues/143
     //                                                        https://github.com/nikitabobko/AeroSpace/issues/335
     if let size { window.set(Ax.sizeAttr, size) }
-    try job.checkCancellation()
     if let topLeft { window.set(Ax.topLeftCornerAttr, topLeft) } else { return }
-    try job.checkCancellation()
     if let size { window.set(Ax.sizeAttr, size) }
 }
 
