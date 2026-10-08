@@ -9,6 +9,7 @@ Videos:
 - [YouTube Guide by Josean Martinez](https://www.youtube.com/watch?v=-FoWClVHG5g)
 
 Docs:
+- [HyprSpace integrated workspace status](docs/hyprspace-workspace-status.md)
 - [AeroSpace Guide](https://nikitabobko.github.io/AeroSpace/guide)
 - [AeroSpace Commands](https://nikitabobko.github.io/AeroSpace/commands)
 - [AeroSpace Goodies](https://nikitabobko.github.io/AeroSpace/goodies)

@@ -68,6 +68,7 @@ enum AxPermissionStatus: Equatable {
         items.insert(mode, at: 0)
     }
     TrayMenuModel.shared.trayItems = items
+    if !isUnitTest { WorkspaceModel.shared.updateFromTree() }
 }
 
 struct WorkspaceViewModel: Hashable {
