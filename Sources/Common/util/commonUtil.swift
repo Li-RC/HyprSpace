@@ -88,6 +88,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     case configAutoReload
     case globalObserver(String)
     case globalObserverLeftMouseUp
+    case groupBar
     case menuBarButton
     case hotkeyBinding
     case startup
@@ -111,6 +112,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .globalObserver(let str): "globalObserver(\(str))"
             case .globalObserverLeftMouseUp: "globalObserverLeftMouseUp"
             case .hotkeyBinding: "hotkeyBinding"
+            case .groupBar: "groupBar"
             case .menuBarButton: "menuBarButton"
             case .resetManipulatedWithMouse: "resetManipulatedWithMouse"
             case .socketServer(let args): "socketServer: \(args)"

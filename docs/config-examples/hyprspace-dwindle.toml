@@ -12,6 +12,12 @@ gaps.outer.right = 8
 gaps.outer.top = 8
 gaps.outer.bottom = 8
 
+[window-borders]
+enabled = true
+width = 2
+active-color = '#89b4fa'
+inactive-color = '#45475a'
+
 [mode.main.binding]
 ctrl-h = 'focus left'
 ctrl-j = 'focus down'
@@ -30,3 +36,11 @@ ctrl-2 = 'workspace 2'
 ctrl-shift-1 = 'move-node-to-workspace 1'
 ctrl-shift-2 = 'move-node-to-workspace 2'
 ctrl-shift-r = 'reload-config'
+ctrl-g = 'group toggle'
+ctrl-tab = 'group next'
+ctrl-shift-tab = 'group prev'
+ctrl-shift-g = 'group remove'
+ctrl-shift-left = 'group join-left'
+ctrl-shift-down = 'group join-down'
+ctrl-shift-up = 'group join-up'
+ctrl-shift-right = 'group join-right'

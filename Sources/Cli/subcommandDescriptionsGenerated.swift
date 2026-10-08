@@ -16,6 +16,7 @@ let subcommandDescriptions = [
     ["  focus-monitor", "Focus monitor by relative direction, by order, or by pattern"],
     ["  focus", "Set focus to a window."],
     ["  fullscreen", "Toggle the fullscreen mode for the focused window"],
+    ["  group", "Create window groups, join neighbors, and cycle members"],
     ["  join-with", "Put the focused window and the nearest node in the specified direction under a common parent container"],
     ["  layout", "Change layout of the focused node to the given layout"],
     ["  list-apps", "Print the list of running applications that appears in the Dock and may have a user interface"],

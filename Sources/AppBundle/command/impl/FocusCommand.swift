@@ -201,6 +201,7 @@ extension TreeNode {
             case .window(let window):
                 return window
             case .tilingContainer(let container):
+                if container.isWindowGroup { return container.mostRecentWindowRecursive }
                 if direction.orientation == container.orientation {
                     return (direction.isPositive ? container.children.last : container.children.first)?
                         .findLeafWindowRecursive(snappedTo: direction)

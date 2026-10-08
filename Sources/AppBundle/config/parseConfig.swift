@@ -138,6 +138,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
 
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-dwindle-tiling": Parser(\.enableDwindleTiling, parseBool),
+    "window-borders": Parser(\.windowBorders, parseWindowBorders),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),

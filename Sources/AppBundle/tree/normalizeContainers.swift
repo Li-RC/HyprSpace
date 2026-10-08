@@ -14,7 +14,8 @@ extension TilingContainer {
         for child in children {
             (child as? TilingContainer)?.unbindEmptyAndAutoFlatten()
         }
-        if let child = children.singleOrNil(),
+        if children.isEmpty { isWindowGroup = false }
+        if !isWindowGroup, let child = children.singleOrNil(),
            (config.enableNormalizationFlattenContainers || (config.enableDwindleTiling && layout == .tiles)) &&
            (child is TilingContainer || !isRootContainer)
         {
@@ -36,6 +37,7 @@ extension TilingContainer {
     // Moves and explicit layout commands can leave more than two siblings. Keep their order,
     // total weight, and focus while restoring binary splits.
     @MainActor fileprivate func normalizeDwindle() {
+        if isWindowGroup { return }
         let mru = mostRecentChild
         if layout == .tiles && children.count > 2 {
             let tail = Array(children.dropFirst())

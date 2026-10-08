@@ -228,6 +228,9 @@ func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: W
         ? workspace.rootTilingContainer.mostRecentWindowRecursive
         : workspace.mostRecentWindowRecursive
     if let mruWindow, let tilingParent = mruWindow.parent as? TilingContainer {
+        if tilingParent.isWindowGroup {
+            return BindingData(parent: tilingParent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        }
         if config.enableDwindleTiling && tilingParent.layout == .tiles {
             let rect = workspace.lastAppliedLayoutPhysicalRect ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
             let orientation = mruWindow.dwindleSplitOrientation(in: rect)

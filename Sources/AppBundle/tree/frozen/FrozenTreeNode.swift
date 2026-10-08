@@ -8,6 +8,8 @@ enum FrozenTreeNode: Sendable {
 
 struct FrozenContainer: Sendable {
     let children: [FrozenTreeNode]
+    let isWindowGroup: Bool
+    let activeWindowId: UInt32?
     let layout: Layout
     let orientation: Orientation
     let weight: CGFloat
@@ -26,6 +28,8 @@ struct FrozenContainer: Sendable {
                     illegalChildParentRelation(child: $0, parent: container)
             }
         }
+        isWindowGroup = container.isWindowGroup
+        activeWindowId = container.mostRecentWindowRecursive?.windowId
         layout = container.layout
         orientation = container.orientation
         weight = getWeightOrNil(container) ?? 1

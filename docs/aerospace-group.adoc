@@ -1,0 +1,48 @@
+= aerospace-group(1)
+include::util/man-attributes.adoc[]
+// tag::purpose[]
+:manpurpose: Create window groups, join neighbors, and cycle members
+// end::purpose[]
+:manname: aerospace-group
+
+== Synopsis
+[verse]
+// tag::synopsis[]
+aerospace group [-h|--help] [--window-id <window-id>] (toggle|next|prev|remove|join-left|join-down|join-up|join-right)
+
+// end::synopsis[]
+
+== Description
+// tag::body[]
+A group occupies one tile and displays its most recently focused member.
+The group bar lists members in order. Click a tab or use keyboard commands to
+select its member. Only the bar receives clicks; borders remain click-through.
+
+`toggle` creates a group around the target tiled window, or dissolves its existing group.
+New tiled windows join the most recently focused tiled group.
+`next` and `prev` select members in order and wrap around.
+`remove` extracts the target member into a separate tile.
+`join-left`, `join-down`, `join-up`, and `join-right` merge the target's group
+(or its single window) into the nearest neighboring tile's group.
+
+Groups survive single-member normalization and retain their active member in the
+closed-window cache used to restore windows after sleep. Closing the active member
+selects the most recently focused remaining member.
+
+Directional `move` moves the whole group, swaps with neighboring tiles, and stops
+beside groups in nested splits. With dwindle enabled, movement stops at workspace
+edges by default; explicit `--boundaries-action` options override this.
+Workspace and monitor transfer, floating, and mouse movement operate on the individual member.
+Use `group join-*` or dragging to join. Directional focus skips inactive members. Resize operates
+on the group's tile. `flatten-workspace-tree` dissolves groups in that workspace.
+In dwindle mode, dropping a tiled or floating window in a group's center or on its
+bar joins it on mouse release. Dropping near an edge creates a separate split on
+that side; this also extracts a member dropped near its own group's edge.
+Outside dwindle mode, dropping anywhere on a group joins it. Animations are not implemented.
+
+== Options
+-h, --help:: Print help
+--window-id <window-id>::
+include::./util/window-id-flag-desc.adoc[]
+// end::body[]
+include::util/man-footer.adoc[]

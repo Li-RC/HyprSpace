@@ -3,6 +3,7 @@ import AppKit
 
 final class TestWindow: Window, CustomStringConvertible {
     private var _rect: Rect?
+    var appliedFrames = 0
     var isMacosFullscreenForTest = false
 
     @MainActor
@@ -39,6 +40,14 @@ final class TestWindow: Window, CustomStringConvertible {
 
     @MainActor override func getAxSize(_ cm: CancellationMode) async throws -> CGSize? {
         _rect.map { CGSize(width: $0.width, height: $0.height) }
+    }
+
+    override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
+        appliedFrames += 1
+        let point = topLeft ?? _rect?.topLeftCorner ?? .zero
+        _rect = Rect(topLeftX: point.x, topLeftY: point.y,
+                     width: size?.width ?? _rect?.width ?? 0,
+                     height: size?.height ?? _rect?.height ?? 0)
     }
 
     override func isMacosFullscreen(_ cm: CancellationMode) async throws -> Bool { isMacosFullscreenForTest }

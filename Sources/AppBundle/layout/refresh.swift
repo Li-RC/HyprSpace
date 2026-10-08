@@ -81,6 +81,7 @@ func runLightSession<T>(
         updateTrayText()
         SecureInputPanel.shared.refresh()
         if !event.isFocusFollowsMouse { try await layoutWorkspaces() }
+        else { WindowDecorations.shared.refresh() }
         if focusBefore != focusAfter {
             focusAfter?.nativeFocus() // syncFocusToMacOs
         }
@@ -155,6 +156,7 @@ enum OptimalHideCorner {
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    defer { WindowDecorations.shared.refresh() }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
             workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
@@ -191,8 +193,12 @@ private func layoutWorkspaces() async throws {
     // to reduce flicker, first unhide visible workspaces, then hide invisible ones
     for monitor in monitors {
         let workspace = monitor.activeWorkspace
-        workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
+        workspace.allLeafWindowsRecursive.filter { !$0.isInactiveGroupMember }.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
         try await workspace.layoutWorkspace()
+        let corner = monitorToOptimalHideCorner[monitor.rect.topLeftCorner] ?? .bottomRightCorner
+        for window in workspace.allLeafWindowsRecursive where window.isInactiveGroupMember {
+            try await (window as! MacWindow).hideInCorner(corner)
+        }
     }
     for workspace in Workspace.all where !workspace.isVisible {
         let corner = monitorToOptimalHideCorner[workspace.workspaceMonitor.rect.topLeftCorner] ?? .bottomRightCorner

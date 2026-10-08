@@ -39,6 +39,7 @@ struct Config: ConvenienceMutable {
     var _indentForNestedContainersWithTheSameOrientation: Void = ()
     var enableNormalizationFlattenContainers: Bool = true
     var enableDwindleTiling: Bool = false
+    var windowBorders = WindowBorders()
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
     var defaultRootContainerLayout: Layout = .tiles
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto

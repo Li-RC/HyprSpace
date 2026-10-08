@@ -9,7 +9,7 @@ struct ResizeCommand: Command {
         guard let target = args.resolveTargetOrReportError(env, io) else { return .fail }
 
         let candidates = target.windowOrNil?.parentsWithSelf
-            .filter { ($0.parent as? TilingContainer)?.layout == .tiles }
+            .filter { ($0.parent as? TilingContainer)?.layout == .tiles && ($0.parent as? TilingContainer)?.isWindowGroup != true }
             ?? []
 
         let orientation: Orientation?

@@ -43,6 +43,18 @@ extension TreeNode {
             case .tilingContainer(let container):
                 lastAppliedLayoutPhysicalRect = physicalRect
                 lastAppliedLayoutVirtualRect = virtual
+                if container.isWindowGroup && TrayMenuModel.shared.isEnabled {
+                    for window in container.allLeafWindowsRecursive where window != container.mostRecentWindowRecursive {
+                        window.lastAppliedLayoutPhysicalRect = nil
+                        window.lastAppliedLayoutVirtualRect = nil
+                    }
+                    if let active = container.mostRecentWindowRecursive {
+                        let fullscreen = active.isFullscreen && active == context.workspace.rootTilingContainer.mostRecentWindowRecursive
+                        let barHeight = fullscreen ? 0 : min(windowGroupBarHeight, height)
+                        try await active.layoutRecursive(point.addingYOffset(barHeight), width: width, height: height - barHeight, virtual: virtual, context)
+                    }
+                    return
+                }
                 switch container.layout {
                     case .tiles:
                         try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context)
@@ -72,6 +84,7 @@ extension Window {
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
         let workspace = context.workspace
         let windowRect = try await getAxRect(.cancellable) // Probably not idempotent
+        lastAppliedLayoutPhysicalRect = windowRect
         let currentMonitor = windowRect?.center.monitorApproximation
         if let currentMonitor, let windowRect, workspace != currentMonitor.activeWorkspace {
             let windowTopLeftCorner = windowRect.topLeftCorner
@@ -87,9 +100,11 @@ extension Window {
             newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
             newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
 
+            lastAppliedLayoutPhysicalRect = Rect(topLeftX: newX, topLeftY: newY, width: windowWidth, height: windowHeight)
             setAxFrame(CGPoint(x: newX, y: newY), nil)
         }
         if isFullscreen {
+            lastAppliedLayoutPhysicalRect = nil
             layoutFullscreen(context)
             isFullscreen = false
         }

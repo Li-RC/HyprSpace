@@ -102,6 +102,10 @@ extension CGPoint {
     @MainActor
     private func _findWindowRecursively(in tree: TilingContainer, virtual: Bool) -> Window? {
         let point = self
+        if tree.isWindowGroup {
+            let rect = virtual ? tree.lastAppliedLayoutVirtualRect : tree.lastAppliedLayoutPhysicalRect
+            return rect?.contains(point) == true ? tree.mostRecentWindowRecursive : nil
+        }
         let target: TreeNode? = switch tree.layout {
             case .tiles:
                 tree.children.first(where: {

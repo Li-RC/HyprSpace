@@ -4,6 +4,7 @@ import Common
 final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider renaming to GenericContainer
     fileprivate var _orientation: Orientation
     var orientation: Orientation { _orientation }
+    var isWindowGroup = false
     var layout: Layout
 
     @MainActor
@@ -46,6 +47,7 @@ extension TilingContainer {
     }
 
     func normalizeOppositeOrientationForNestedContainers() {
+        if isWindowGroup { return }
         if orientation == (parent as? TilingContainer)?.orientation {
             _orientation = orientation.opposite
         }

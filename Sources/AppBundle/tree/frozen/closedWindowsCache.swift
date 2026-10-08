@@ -96,6 +96,7 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
         index: index,
     )
 
+    container.isWindowGroup = frozenContainer.isWindowGroup
     for (index, child) in frozenContainer.children.enumerated() {
         switch child {
             case .window(let w):
@@ -106,6 +107,9 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
                 // There is no reason to continue
                 if !restoreTreeRecursive(frozenContainer: c, parent: container, index: index) { return false }
         }
+    }
+    if container.isWindowGroup {
+        container.children.first { ($0 as? Window)?.windowId == frozenContainer.activeWindowId }?.markAsMostRecentChild()
     }
     return true
 }

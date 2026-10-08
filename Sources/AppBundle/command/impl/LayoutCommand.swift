@@ -104,6 +104,7 @@ struct LayoutCommand: Command {
         case .tilingContainer(let parent):
             let targetOrientation = targetOrientation ?? parent.orientation
             let targetLayout = targetLayout ?? parent.layout
+            parent.isWindowGroup = false
             parent.layout = targetLayout
             parent.changeOrientation(targetOrientation)
             return .succ
