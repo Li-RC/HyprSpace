@@ -9,6 +9,9 @@ import Foundation
         initServerArgs()
         await waitForAccessibilityPermission_nonCancellable()
         if isDebug {
+            // Unbundled SwiftPM executables start with a prohibited activation policy,
+            // which prevents delivery of global hotkey events.
+            NSApplication.shared.setActivationPolicy(.accessory)
             await toggleReleaseServerIfDebug(.off)
             interceptTermination(SIGINT)
             interceptTermination(SIGKILL)
