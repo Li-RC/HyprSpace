@@ -7,9 +7,12 @@ HyprSpace includes Workspace Status in its own process, replacing the original A
 Quit the standalone Workspace Status app and any running HyprSpace/AeroSpace instance, then run from the HyprSpace repository:
 
 ```sh
-swift build
+hyprspace_sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+swift build -Xlinker -platform_version -Xlinker macos -Xlinker 13.0 -Xlinker "$hyprspace_sdk_version"
 .build/debug/AeroSpaceApp --config-path docs/config-examples/hyprspace-dwindle.toml
 ```
+
+The SDK linker flags enable the current macOS system appearance while keeping macOS 13 as the deployment target. A plain `swift build` can record SDK 13 in the executable metadata; `build-debug.sh` also supplies the correct SDK version automatically.
 
 The executable name remains `AeroSpaceApp`. Accessibility permission belongs to the process running HyprSpace; the standalone Workspace Status app's permission does not transfer.
 
