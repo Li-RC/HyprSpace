@@ -35,13 +35,15 @@ It defaults to false.
 `group toggle` marks the focused tiled window as a group. New tiled windows join
 that group while it is the tiled insertion target. Only the active member is
 shown; other members use AeroSpace's existing offscreen hiding mechanism.
-The bar lists member numbers and application names. Click a tab to switch to
-that member, or cycle members with the keyboard.
+The bar shows application names on a native Liquid Glass background on macOS 26 and later (material on older macOS),
+with an 8-point gap above the window. Click a tab to switch to that member, or
+cycle members with the keyboard.
 
 `group next` and `group prev` wrap through members. `group join-right` (or another
 direction) joins a neighbor; if both tiles are groups, it merges their members.
 `group remove` extracts the active member. `group toggle` on an existing group
-dissolves it back into tiles. Closing the active member selects a remaining one.
+also extracts only the target window, leaving the other members grouped. Closing
+the active member selects a remaining one.
 Directional focus treats a group as one tile, and resizing adjusts its whole tile.
 The active member and group structure are included in the restoration cache.
 
@@ -123,7 +125,7 @@ It uses Control for these shortcuts:
 | Switch workspace | Control + 1/2 |
 | Send window to workspace | Control + Shift + 1/2 |
 | Reload this config | Control + Shift + R |
-| Create/dissolve a group | Control + G |
+| Create group / extract current member | Control + G |
 | Next/previous group member | Control + Tab / Control + Shift + Tab |
 | Extract member from group | Control + Shift + G |
 | Join neighbor in direction | Control + Shift + arrow key |
@@ -149,7 +151,7 @@ It uses Control for these shortcuts:
    and that clicks inside the application still reach it.
 10. Close the active member. Expect a remaining member to occupy the tile without
     needing a click. Extract a member with Control + Shift + G, then join the
-    neighbor with Control + Shift + an arrow key. Dissolve with Control + G.
+    neighbor with Control + Shift + an arrow key. Press Control + G to extract only the current member; the other members stay grouped.
 11. Check that the blue border follows focus, inactive borders are muted, and
     decorations disappear on hidden workspaces and fullscreen. Toggle floating
     and check its border. Reload after changing border width or colors.

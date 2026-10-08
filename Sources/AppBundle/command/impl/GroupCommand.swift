@@ -11,7 +11,7 @@ struct GroupCommand: Command {
         guard window.parent is TilingContainer else { return .fail(io.err("Groups require a tiled window")) }
         switch args.action.val {
             case .toggle:
-                if let group = window.windowGroup { group.isWindowGroup = false } else { window.createWindowGroup() }
+                if window.windowGroup != nil { window.removeFromWindowGroup() } else { window.createWindowGroup() }
             case .remove:
                 guard window.windowGroup != nil else { return .fail(io.err("Window is not grouped")) }
                 window.removeFromWindowGroup()

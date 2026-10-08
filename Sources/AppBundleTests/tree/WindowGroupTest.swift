@@ -102,7 +102,7 @@ final class WindowGroupTest: XCTestCase {
         XCTAssertNil(second.windowGroup)
     }
 
-    func testDissolvingGroupRestoresDwindleAndFocus() async {
+    func testToggleExtractsOnlyTargetAndPreservesRemainingGroupAndFocus() async {
         let workspace = Workspace.get(byName: name)
         let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
         let group = first.createWindowGroup()
@@ -112,10 +112,30 @@ final class WindowGroupTest: XCTestCase {
         let toggled = await run("toggle", second)
         XCTAssertEqual(toggled, 0)
         workspace.normalizeContainers()
-        XCTAssertEqual(workspace.rootTilingContainer.allLeafWindowsRecursive, [first, second, third])
-        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.allSatisfy { $0.windowGroup == nil })
-        XCTAssertEqual(workspace.rootTilingContainer.children.count, 2)
+        XCTAssertEqual(group.children, [first, third])
+        XCTAssertTrue(group.isWindowGroup)
+        XCTAssertEqual(first.windowGroup, group)
+        XCTAssertEqual(third.windowGroup, group)
+        XCTAssertNil(second.windowGroup)
+        XCTAssertEqual(workspace.rootTilingContainer.children, [group, second])
         XCTAssertEqual(workspace.rootTilingContainer.mostRecentWindowRecursive, second)
+        XCTAssertEqual(focus.windowOrNil, second)
+    }
+
+    func testToggleExtractsLastMemberOfRootGroup() async {
+        let workspace = Workspace.get(byName: name)
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.createWindowGroup()
+        workspace.normalizeContainers()
+        XCTAssertTrue(workspace.rootTilingContainer.isWindowGroup)
+        XCTAssertTrue(window.focusWindow())
+        let result = await run("toggle", window)
+        XCTAssertEqual(result, 0)
+        workspace.normalizeContainers()
+        XCTAssertNil(window.windowGroup)
+        XCTAssertFalse(workspace.rootTilingContainer.isWindowGroup)
+        XCTAssertEqual(workspace.rootTilingContainer.children, [window])
+        XCTAssertEqual(focus.windowOrNil, window)
     }
 
     func testDirectionalFocusSkipsHiddenMembersAndResizeChangesWholeTile() async {

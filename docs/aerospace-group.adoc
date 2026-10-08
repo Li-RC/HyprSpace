@@ -18,7 +18,8 @@ A group occupies one tile and displays its most recently focused member.
 The group bar lists members in order. Click a tab or use keyboard commands to
 select its member. Only the bar receives clicks; borders remain click-through.
 
-`toggle` creates a group around the target tiled window, or dissolves its existing group.
+`toggle` creates a group around the target tiled window, or extracts only that window
+from its existing group. The remaining members stay grouped.
 New tiled windows join the most recently focused tiled group.
 `next` and `prev` select members in order and wrap around.
 `remove` extracts the target member into a separate tile.
