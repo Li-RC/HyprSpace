@@ -121,8 +121,9 @@ final class GroupTabReorderTest: XCTestCase {
         let second = TestWindow.new(id: 2, parent: group)
         let view = DecorationView(frame: NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight))
         view.updateGroup(group)
-        let firstTab = view.subviews[0]
-        let secondTab = view.subviews[1]
+        let tabs = view.subviews.compactMap { $0 as? GroupTabView }
+        let firstTab = tabs[0]
+        let secondTab = tabs[1]
         XCTAssertTrue(group.reorderWindowGroupMember(first.windowId, to: 1))
         view.updateGroup(group)
         XCTAssertTrue(view.subviews.contains { $0 === firstTab })
@@ -146,9 +147,9 @@ final class GroupTabReorderTest: XCTestCase {
         panel.contentView = view
         defer { panel.close() }
         view.updateGroup(group)
-        let tab = view.subviews[0]
+        let tab = view.subviews.compactMap { $0 as? GroupTabView }[0]
         func event(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
-            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [], timestamp: 0,
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [.control], timestamp: 0,
                               windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
         }
         view.mouseDown(with: event(.leftMouseDown, x: 50))
@@ -210,4 +211,70 @@ final class GroupTabReorderTest: XCTestCase {
         XCTAssertEqual(group.children, [first])
     }
 
+
+    func testPlainDragDoesNotReorderAndReleasingControlCancelsReorder() {
+        for flags: NSEvent.ModifierFlags in [[], [.control]] {
+            setUpWorkspacesForTests()
+            TrayMenuModel.shared.isEnabled = true
+            let workspace = Workspace.get(byName: name)
+            let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+            let group = first.createWindowGroup()
+            let second = TestWindow.new(id: 2, parent: group)
+            XCTAssertTrue(second.focusWindow())
+            let view = DecorationView(frame: NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight))
+            let panel = NSPanel(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            panel.contentView = view
+            view.updateGroup(group)
+            func event(_ type: NSEvent.EventType, x: CGFloat, flags: NSEvent.ModifierFlags) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: flags, timestamp: 0,
+                                  windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            view.mouseDown(with: event(.leftMouseDown, x: 50, flags: flags))
+            view.mouseDragged(with: event(.leftMouseDragged, x: 250, flags: flags))
+            XCTAssertEqual(group.children, flags.contains(.control) ? [second, first] : [first, second])
+            view.mouseUp(with: event(.leftMouseUp, x: 250, flags: []))
+            XCTAssertEqual(group.children, [first, second])
+            XCTAssertEqual(focus.windowOrNil, second)
+            if #available(macOS 27.0, *) { XCTAssertFalse(view.nativeTabs!.isHidden) }
+            panel.close()
+        }
+    }
+
+    func testNativeGlassTabsReflectSelectionAndRouteControlDrag() throws {
+        guard #available(macOS 27.0, *) else { throw XCTSkip("Native glass tabs require macOS 27") }
+        TrayMenuModel.shared.isEnabled = true
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        XCTAssertTrue(second.focusWindow())
+        let bar = GroupBarView()
+        bar.frame = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
+        bar.layoutSubtreeIfNeeded()
+        let panel = NSPanel(contentRect: bar.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        panel.contentView = bar
+        defer { panel.close() }
+        let view = bar.tabs
+        view.updateGroup(group)
+        let control = try XCTUnwrap(view.nativeTabs)
+        XCTAssertEqual(control.role, .tabs)
+        XCTAssertEqual(control.borderShape, .capsule)
+        XCTAssertEqual(control.segmentCount, 2)
+        XCTAssertEqual(control.selectedSegment, 1)
+        XCTAssertTrue(bar.background.isHidden)
+        func event(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [.control], timestamp: 0,
+                              windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+        }
+        control.mouseDown(with: event(.leftMouseDown, x: 50))
+        control.mouseDragged(with: event(.leftMouseDragged, x: 250))
+        XCTAssertEqual(group.children, [second, first])
+        XCTAssertTrue(control.isHidden)
+        XCTAssertFalse(bar.background.isHidden)
+        control.mouseUp(with: event(.leftMouseUp, x: 250))
+        XCTAssertFalse(control.isHidden)
+        XCTAssertTrue(bar.background.isHidden)
+        XCTAssertEqual(control.selectedSegment, 0)
+        XCTAssertEqual(focus.windowOrNil, second)
+    }
 }

@@ -108,7 +108,11 @@ final class GroupBarView: NSView {
         background.autoresizingMask = [.width, .height]
         tabs.autoresizingMask = [.width, .height]
         addSubview(background)
-        if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView {
+        if #available(macOS 27.0, *) {
+            // The native tab control supplies its own glass while idle.
+            addSubview(tabs)
+            background.isHidden = true
+        } else if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView {
             glass.contentView = tabs
         } else {
             background.addSubview(tabs)
@@ -128,14 +132,16 @@ struct GroupTabDrag {
     let windowId: UInt32
     let origin: CGPoint
     let originalIndex: Int
+    var allowsReordering = true
     var isDragging = false
+    var isReordering: Bool { allowsReordering && isDragging }
     var targetIndex: Int?
     var offsetX: CGFloat = 0
 
     mutating func update(at point: CGPoint, in bounds: NSRect, memberCount: Int) {
         if max(abs(point.x - origin.x), abs(point.y - origin.y)) >= 4 { isDragging = true }
-        offsetX = point.x - origin.x
-        targetIndex = isDragging ? groupTabIndex(at: point, in: bounds, memberCount: memberCount) : nil
+        offsetX = allowsReordering ? point.x - origin.x : 0
+        targetIndex = isReordering ? groupTabIndex(at: point, in: bounds, memberCount: memberCount) : nil
     }
 
     func tabOriginX(in bounds: NSRect, memberCount: Int) -> CGFloat {
@@ -146,13 +152,13 @@ struct GroupTabDrag {
 
     @MainActor @discardableResult
     func apply(in group: TilingContainer) -> Bool {
-        guard isDragging, let targetIndex else { return false }
+        guard isReordering, let targetIndex else { return false }
         return group.reorderWindowGroupMember(windowId, to: targetIndex)
     }
 
     @MainActor @discardableResult
     func cancel(in group: TilingContainer) -> Bool {
-        guard isDragging else { return false }
+        guard isReordering else { return false }
         return group.reorderWindowGroupMember(windowId, to: min(originalIndex, group.children.count - 1))
     }
 }
@@ -167,6 +173,7 @@ final class DecorationView: NSView {
     private var tabDrag: GroupTabDrag?
     private var tabViews: [UInt32: GroupTabView] = [:]
     private var tabTargetFrames: [UInt32: NSRect] = [:]
+    private(set) var nativeTabs: GroupTabControl?
 
     func updateGroup(_ group: TilingContainer) {
         let previousIds = memberIds
@@ -174,6 +181,18 @@ final class DecorationView: NSView {
         members = group.allLeafWindowsRecursive.map { $0.app.name ?? "Window" }
         memberIds = group.allLeafWindowsRecursive.map(\.windowId)
         activeIndex = group.mostRecentWindowRecursive?.ownIndex ?? 0
+        if #available(macOS 27.0, *) {
+            if nativeTabs == nil {
+                let control = GroupTabControl(owner: self)
+                nativeTabs = control
+                addSubview(control)
+            }
+            nativeTabs?.update(labels: members, selectedIndex: activeIndex)
+        }
+        let reordering = tabDrag?.isReordering == true
+        nativeTabs?.isHidden = reordering
+        let bar = unsafe superview as? GroupBarView
+        bar?.background.isHidden = nativeTabs != nil && !reordering
         for id in Array(tabViews.keys) where !memberIds.contains(id) {
             tabViews.removeValue(forKey: id)?.removeFromSuperview()
             tabTargetFrames.removeValue(forKey: id)
@@ -184,13 +203,14 @@ final class DecorationView: NSView {
                 tabViews[id] = view
                 addSubview(view)
             }
+            view.isHidden = nativeTabs != nil && !reordering
             view.title = members[index]
             view.selected = index == activeIndex
-            view.dragging = tabDrag?.isDragging == true && tabDrag?.windowId == id
+            view.dragging = tabDrag?.isReordering == true && tabDrag?.windowId == id
             view.showsDivider = index > 0 && index - 1 != activeIndex
             view.needsDisplay = true
         }
-        if let drag = tabDrag, drag.isDragging, let view = tabViews[drag.windowId] {
+        if let drag = tabDrag, drag.isReordering, let view = tabViews[drag.windowId] {
             addSubview(view, positioned: .above, relativeTo: nil)
         }
         layoutGroupTabs(animate: previousIds != memberIds)
@@ -204,11 +224,12 @@ final class DecorationView: NSView {
 
     private func layoutGroupTabs(animate: Bool) {
         guard !memberIds.isEmpty, bounds.width > 0 else { return }
+        nativeTabs?.frame = bounds
         let width = bounds.width / CGFloat(memberIds.count)
         let enabled = animate && config.enableWindowAnimations && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         for (index, id) in memberIds.enumerated() {
             guard let view = tabViews[id] else { continue }
-            let dragging = tabDrag?.isDragging == true && tabDrag?.windowId == id
+            let dragging = tabDrag?.isReordering == true && tabDrag?.windowId == id
             let x = dragging ? tabDrag!.tabOriginX(in: bounds, memberCount: memberIds.count) : bounds.minX + CGFloat(index) * width
             let frame = NSRect(x: x, y: bounds.maxY - windowGroupBarHeight, width: width, height: windowGroupBarHeight)
             // A normal refresh must not interrupt a neighbor's slide halfway through.
@@ -233,11 +254,16 @@ final class DecorationView: NSView {
         guard event.buttonNumber == 0,
               let index = groupTabIndex(at: point, in: bounds, memberCount: memberIds.count) else { return }
         // Keep keyboard focus in the member window until a click is completed.
-        tabDrag = GroupTabDrag(windowId: memberIds[index], origin: point, originalIndex: index)
+        tabDrag = GroupTabDrag(windowId: memberIds[index], origin: point, originalIndex: index,
+                               allowsReordering: event.modifierFlags.contains(.control))
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard var drag = tabDrag else { return }
+        if drag.allowsReordering && !event.modifierFlags.contains(.control) {
+            if let group { _ = drag.cancel(in: group) }
+            drag.allowsReordering = false
+        }
         drag.update(at: convert(event.locationInWindow, from: nil), in: bounds, memberCount: memberIds.count)
         tabDrag = drag
         if TrayMenuModel.shared.isEnabled, let group {
@@ -252,7 +278,11 @@ final class DecorationView: NSView {
         let point = convert(event.locationInWindow, from: nil)
         drag.update(at: point, in: bounds, memberCount: memberIds.count)
         if drag.isDragging {
-            if drag.targetIndex != nil { _ = drag.apply(in: group) } else { _ = drag.cancel(in: group) }
+            if event.modifierFlags.contains(.control), drag.targetIndex != nil {
+                _ = drag.apply(in: group)
+            } else {
+                _ = drag.cancel(in: group)
+            }
             tabDrag = nil
             updateGroup(group)
             layoutGroupTabs(animate: true)
@@ -261,10 +291,15 @@ final class DecorationView: NSView {
         }
         guard let index = groupTabIndex(at: point, in: bounds, memberCount: memberIds.count),
               memberIds[index] == drag.windowId else { return }
+        selectTab(windowId: drag.windowId)
+    }
+
+    func selectTab(windowId: UInt32) {
+        guard let group else { return }
         Task.startUnstructured { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.groupBar, token) {
-                _ = selectGroupTab(windowId: drag.windowId, in: group)
+                _ = selectGroupTab(windowId: windowId, in: group)
             }
         }
     }

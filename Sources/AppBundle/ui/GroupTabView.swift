@@ -55,3 +55,46 @@ final class GroupTabView: NSView {
                                           width: textWidth, height: textSize.height), withAttributes: attributes)
     }
 }
+
+// Use the same native tab/lens treatment as the Settings navigation bar.
+final class GroupTabControl: NSSegmentedControl {
+    private weak var owner: DecorationView?
+
+    init(owner: DecorationView) {
+        self.owner = owner
+        super.init(frame: .zero)
+        if #available(macOS 27.0, *) { role = .tabs }
+        if #available(macOS 26.0, *) { borderShape = .capsule }
+        segmentDistribution = .fill
+        trackingMode = .selectOne
+        font = .systemFont(ofSize: 13)
+        focusRingType = .none
+        target = self
+        action = #selector(selectTab)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func update(labels: [String], selectedIndex: Int) {
+        if segmentCount != labels.count { segmentCount = labels.count }
+        for (index, label) in labels.enumerated() where self.label(forSegment: index) != label {
+            setLabel(label, forSegment: index)
+        }
+        if selectedSegment != selectedIndex { selectedSegment = selectedIndex }
+    }
+
+    @objc private func selectTab() {
+        guard let owner, owner.memberIds.indices.contains(selectedSegment) else { return }
+        owner.selectTab(windowId: owner.memberIds[selectedSegment])
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) { owner?.mouseDown(with: event) }
+        else { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) { owner?.mouseDragged(with: event) }
+    override func mouseUp(with event: NSEvent) { owner?.mouseUp(with: event) }
+}
