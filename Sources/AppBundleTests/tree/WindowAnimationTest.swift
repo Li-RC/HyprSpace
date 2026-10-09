@@ -109,9 +109,9 @@ final class WindowAnimationTest: XCTestCase {
     }
 
     @MainActor func testSlowAnimationConsumerSkipsOldTicksAndOtherConsumerSurvivesCancellation() async throws {
-        let frame = CGRect(x: 100, y: 100, width: 200, height: 200)
-        let (stopFirst, first) = DisplayFrameClock.frames(for: frame)
-        let (stopSecond, second) = DisplayFrameClock.frames(for: frame)
+        // Stream buffering must be testable even while the display is asleep.
+        let (stopFirst, first) = DisplayFrameClock.frames(screen: nil)
+        let (stopSecond, second) = DisplayFrameClock.frames(screen: nil)
         defer { stopFirst(); stopSecond() }
         var firstTicks = first.makeAsyncIterator()
         var secondTicks = second.makeAsyncIterator()

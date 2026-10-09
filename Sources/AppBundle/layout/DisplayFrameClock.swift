@@ -8,6 +8,9 @@ final class DisplayFrameClock: NSObject {
     private static var animationStreams: [NSScreen?: [UUID: AsyncStream<Double>.Continuation]] = [:]
     private var displayLink: AnyObject?
     private var timer: Timer?
+    private var lastTick = ProcessInfo.processInfo.systemUptime
+    private var fallbackDelay: Double = 0
+    private var paused = false
     private let tick: @MainActor () -> Void
 
     init(screen: NSScreen?, tick: @escaping @MainActor () -> Void) {
@@ -19,17 +22,27 @@ final class DisplayFrameClock: NSObject {
             link.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
             link.add(to: .main, forMode: .common)
             displayLink = link
-        } else {
-            let timer = Timer(timeInterval: 1.0 / Double(screen?.maximumFramesPerSecond ?? 60),
-                              target: self, selector: #selector(displayTick), userInfo: nil, repeats: true)
-            RunLoop.main.add(timer, forMode: .common)
-            self.timer = timer
         }
+        let interval = 1.0 / Double(screen?.maximumFramesPerSecond ?? 60)
+        fallbackDelay = displayLink == nil ? 0 : interval * 2
+        let timer = Timer(timeInterval: interval, target: self, selector: #selector(timerTick), userInfo: nil, repeats: true)
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
-    @objc private func displayTick() { tick() }
+    @objc private func displayTick() {
+        lastTick = ProcessInfo.processInfo.systemUptime
+        tick()
+    }
+
+    @objc private func timerTick() {
+        if ProcessInfo.processInfo.systemUptime - lastTick >= fallbackDelay { displayTick() }
+    }
 
     func setPaused(_ paused: Bool) {
+        guard self.paused != paused else { return }
+        self.paused = paused
+        if !paused { lastTick = ProcessInfo.processInfo.systemUptime }
         if #available(macOS 14, *) { (displayLink as? CADisplayLink)?.isPaused = paused }
         timer?.fireDate = paused ? .distantFuture : Date()
     }
@@ -47,8 +60,11 @@ final class DisplayFrameClock: NSObject {
     }
 
     static func frames(for frame: CGRect) -> (@MainActor @Sendable () -> Void, AsyncStream<Double>) {
+        frames(screen: screen(for: frame))
+    }
+
+    static func frames(screen: NSScreen?) -> (@MainActor @Sendable () -> Void, AsyncStream<Double>) {
         let (stream, continuation) = AsyncStream<Double>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        let screen = screen(for: frame)
         let id = UUID()
         animationStreams[screen, default: [:]][id] = continuation
         if animationClocks[screen] == nil {
