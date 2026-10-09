@@ -16,6 +16,7 @@ final class MacApp: AbstractApp {
     var lastNativeFocusedWindowId: UInt32? = nil
     private var thread: Thread?
     private var setFrameJobs: [UInt32: RunLoopJob] = [:]
+    private var frameAnimationTargets: [UInt32: CGRect] = [:]
     @MainActor private static var focusJob: RunLoopJob? = nil
 
     /*conforms*/ var name: String? { nsApp.localizedName }
@@ -102,6 +103,7 @@ final class MacApp: AbstractApp {
     func closeAndUnregisterAxWindow(_ windowId: UInt32) {
         if serverArgs.isReadOnly { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        frameAnimationTargets.removeValue(forKey: windowId)
         _ = withWindowAsync(windowId, .cancellable) { [windows] window, job in
             guard let closeButton = window.get(Ax.closeButtonAttr) else { return }
             if AXUIElementPerformAction(closeButton.cast, kAXPressAction as CFString) == .success {
@@ -147,11 +149,44 @@ final class MacApp: AbstractApp {
         }
     }
 
-    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
+    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, animate: Bool = false) {
+        let target = topLeft.flatMap { point in size.map { CGRect(origin: point, size: $0) } }
+        // AX notifications can request the same layout again during an animation.
+        if animate, let target, frameAnimationTargets[windowId] == target,
+           let job = setFrameJobs[windowId], !job.isCancelled { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        setFrameJobs[windowId] = withWindowAsync(windowId, .cancellable) { [axApp] window, job in
-            try disableAnimations(app: axApp.threadGuarded, job) {
-                try setFrame(window, topLeft, size, job)
+        frameAnimationTargets[windowId] = animate ? target : nil
+        setFrameJobs[windowId] = withWindowAsync(windowId, .cancellable) { [axApp, windows] window, job in
+            guard animate, let target,
+                  let rect = try? AppBundle.getAxRect(window: window, job: job) else {
+                defer { job.cancel() }
+                try disableAnimations(app: axApp.threadGuarded, job) {
+                    try setFrame(window, topLeft, size, job)
+                }
+                return
+            }
+            let start = CGRect(origin: rect.topLeftCorner, size: rect.size)
+            if start == target { job.cancel(); return }
+            let thread = Thread.current
+            let began = ProcessInfo.processInfo.systemUptime
+            Task.startUnstructured {
+                defer { job.cancel() }
+                while !job.isCancelled {
+                    let progress = min(1, (ProcessInfo.processInfo.systemUptime - began) / 0.18)
+                    let frame = animatedWindowFrame(from: start, to: target, progress: progress)
+                    try await thread.runInLoop(.cancellable) { _ in
+                        try job.checkCancellation()
+                        guard !isLeftMouseButtonDown, let window = windows.threadGuarded[windowId] else {
+                            job.cancel()
+                            return
+                        }
+                        try disableAnimations(app: axApp.threadGuarded, job) {
+                            try setFrame(window.ax, frame.origin, frame.size, job)
+                        }
+                    }
+                    if progress == 1 { return }
+                    try await Task.sleep(for: .milliseconds(1000.0 / 60))
+                }
             }
         }
     }
@@ -326,6 +361,7 @@ final class MacApp: AbstractApp {
         windowsCount = alive.count
         for windowId in dead {
             setFrameJobs.removeValue(forKey: windowId)?.cancel()
+            frameAnimationTargets.removeValue(forKey: windowId)
         }
         return alive
     }
@@ -336,6 +372,7 @@ final class MacApp: AbstractApp {
             job.cancel()
         }
         setFrameJobs = [:]
+        frameAnimationTargets = [:]
         thread?.runInLoopAsync(job: RunLoopJob(.nonCancellable)) { job in CFRunLoopStop(CFRunLoopGetCurrent()) }
         thread = nil // Disallow all future job submissions
     }

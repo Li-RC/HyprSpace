@@ -1,7 +1,7 @@
 # HyprSpace: dwindle, window groups, and borders
 
 HyprSpace adds binary tiling, window groups with a member bar, and
-configurable focused and inactive window borders. Animations are deferred.
+configurable focused and inactive window borders, with opt-in experimental animations.
 Executable names and the config search paths still use AeroSpace's names.
 
 Set `enable-dwindle-tiling = true` at the top level of your configuration,
@@ -29,6 +29,24 @@ The bundled default and refreshed v0.1.0 downloads enable it. Existing personal 
   remain available. Accordion containers retain their accordion layout.
 - Disabling dwindle stops binary normalization and split insertion; it does
   not undo the existing tree. `flatten-workspace-tree` can flatten it afterward.
+
+## Experimental window animations
+
+Set `enable-window-animations = true` at the top level of your config to try
+180 ms ease-out movement and resizing when tiled layouts change. It defaults
+to false. Each window finishes a frame update before sending the next one;
+new targets cancel the previous animation, while repeated requests for the
+same target do not restart it.
+
+Startup, first placement, workspace/group reveals, fullscreen, and direct mouse
+dragging keep immediate placement. macOS Reduce Motion also disables animations.
+Borders and group bars follow their owner's native move and resize notifications.
+
+For a live trial, move and resize tiles repeatedly, reverse direction before
+the animation finishes, and check that each window settles at its latest tile.
+Check border alignment, mouse dragging, group switching, and workspace switching.
+Test multiple apps: Accessibility response time and application minimum sizes
+can affect the visual result. Turn the setting off and reload to compare.
 
 ## Groups and borders
 

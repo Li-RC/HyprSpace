@@ -40,6 +40,18 @@ open class Window: TreeNode, Hashable {
     func getCenter(_ cm: CancellationMode) async throws -> CGPoint? { try await getAxRect(cm)?.center }
 
     func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) { die("Not implemented") }
+
+    @MainActor
+    func setTilingFrame(_ topLeft: CGPoint, _ size: CGSize) {
+        if let window = self as? MacWindow {
+            window.macApp.setAxFrame(windowId, topLeft, size, animate: config.enableWindowAnimations &&
+                !window.skipNextTilingAnimation && !isStartup && !isHiddenInCorner && !isLeftMouseButtonDown &&
+                !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            window.skipNextTilingAnimation = false
+        } else {
+            setAxFrame(topLeft, size)
+        }
+    }
 }
 
 enum LayoutReason: Equatable {

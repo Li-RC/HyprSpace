@@ -3,6 +3,8 @@
 config-version = 2
 start-at-login = false
 enable-dwindle-tiling = true
+# Experimental 180 ms ease-out movement and resizing of tiled windows.
+enable-window-animations = false
 default-root-container-layout = 'tiles'
 persistent-workspaces = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 
