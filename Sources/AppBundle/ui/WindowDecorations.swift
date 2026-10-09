@@ -43,6 +43,8 @@ final class DecorationPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = false
         ignoresMouseEvents = true
+        // Window capture selection must skip the decoration and select its owner.
+        sharingType = .none
         hidesOnDeactivate = false
         collectionBehavior = [.transient, .fullScreenNone, .ignoresCycle]
         level = .normal
