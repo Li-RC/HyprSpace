@@ -62,6 +62,10 @@ the members immediately as you move. The dragged tab follows the pointer;
 with `enable-window-animations = true`, neighboring tabs slide into their new
 slots over 140 ms. The active window stays selected; release
 inside the bar to keep the order, or outside to restore the original order.
+No modifier key is required. The bar keeps the same glass material during a drag.
+Its light or dark appearance is chosen from the whole display's wallpaper and
+shared by all groups on that display; moving windows and switching tabs do not
+change the choice. A translucent fill keeps the labels readable.
 
 `group next` and `group prev` wrap through members. `group join-right` (or another
 direction) joins a neighbor; if both tiles are groups, it merges their members.
@@ -85,7 +89,8 @@ The narrow border gap also accepts drops. The tree changes on release, so crossi
 tiles does not keep swapping them.
 Dragging a window edge is always treated as resizing, even if macOS reports a
 position change before its resize notification; it never triggers a drop or regroup.
-Dropping a tiled or floating window in a group's center or on its bar joins it;
+Floating windows remain floating when dragged and do not snap into tiles or groups.
+Dropping a tiled window in a group's center or on its bar joins it;
 dropping near its edges creates a separate tile beside the group. Dragging a member
 to its own group's edge extracts that member.
 `flatten-workspace-tree` dissolves groups in the target workspace.
