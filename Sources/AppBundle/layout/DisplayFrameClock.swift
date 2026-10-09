@@ -4,7 +4,7 @@ import QuartzCore
 // Display ticks are lossy: a slow AX write must not build a backlog of frames.
 @MainActor
 final class DisplayFrameClock: NSObject {
-    private static var animationClocks: [NSScreen?: DisplayFrameClock] = [:]
+    private(set) static var animationClocks: [NSScreen?: DisplayFrameClock] = [:]
     private static var animationStreams: [NSScreen?: [UUID: AsyncStream<Double>.Continuation]] = [:]
     private var displayLink: AnyObject?
     private var timer: Timer?
@@ -80,7 +80,7 @@ final class DisplayFrameClock: NSObject {
             animationStreams[screen]?.removeValue(forKey: id)?.finish()
             if animationStreams[screen]?.isEmpty == true {
                 animationStreams.removeValue(forKey: screen)
-                animationClocks[screen]?.setPaused(true)
+                animationClocks.removeValue(forKey: screen)?.stop()
             }
         }, stream)
     }

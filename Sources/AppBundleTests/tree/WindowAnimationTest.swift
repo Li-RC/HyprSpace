@@ -108,6 +108,29 @@ final class WindowAnimationTest: XCTestCase {
         XCTAssertEqual(count, stoppedCount)
     }
 
+    @MainActor func testLastAnimationSubscriberReleasesClockAndOldCancellationDoesNotStopReplacement() {
+        let (stopFirst, _) = DisplayFrameClock.frames(screen: nil)
+        let (stopSecond, _) = DisplayFrameClock.frames(screen: nil)
+        defer { stopFirst(); stopSecond() }
+        weak let clock = DisplayFrameClock.animationClocks[nil]
+        XCTAssertNotNil(clock)
+        stopFirst()
+        XCTAssertTrue(DisplayFrameClock.animationClocks[nil] === clock)
+        stopSecond()
+        XCTAssertNil(DisplayFrameClock.animationClocks[nil])
+        XCTAssertNil(clock, "The run-loop resources must also release their clock target")
+
+        let (stopReplacement, _) = DisplayFrameClock.frames(screen: nil)
+        defer { stopReplacement() }
+        weak let replacement = DisplayFrameClock.animationClocks[nil]
+        XCTAssertNotNil(replacement)
+        stopFirst()
+        stopSecond()
+        XCTAssertTrue(DisplayFrameClock.animationClocks[nil] === replacement)
+        stopReplacement()
+        XCTAssertNil(replacement)
+    }
+
     @MainActor func testSlowAnimationConsumerSkipsOldTicksAndOtherConsumerSurvivesCancellation() async throws {
         // Stream buffering must be testable even while the display is asleep.
         let (stopFirst, first) = DisplayFrameClock.frames(screen: nil)
