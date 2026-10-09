@@ -149,7 +149,7 @@ final class GroupTabReorderTest: XCTestCase {
         view.updateGroup(group)
         let tab = view.subviews.compactMap { $0 as? GroupTabView }[0]
         func event(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
-            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [.control], timestamp: 0,
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [], timestamp: 0,
                               windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
         }
         view.mouseDown(with: event(.leftMouseDown, x: 50))
@@ -212,7 +212,7 @@ final class GroupTabReorderTest: XCTestCase {
     }
 
 
-    func testPlainDragDoesNotReorderAndReleasingControlCancelsReorder() {
+    func testPlainDragReordersAndReleasingControlDoesNotCancel() {
         for flags: NSEvent.ModifierFlags in [[], [.control]] {
             setUpWorkspacesForTests()
             TrayMenuModel.shared.isEnabled = true
@@ -231,9 +231,9 @@ final class GroupTabReorderTest: XCTestCase {
             }
             view.mouseDown(with: event(.leftMouseDown, x: 50, flags: flags))
             view.mouseDragged(with: event(.leftMouseDragged, x: 250, flags: flags))
-            XCTAssertEqual(group.children, flags.contains(.control) ? [second, first] : [first, second])
+            XCTAssertEqual(group.children, [second, first])
             view.mouseUp(with: event(.leftMouseUp, x: 250, flags: []))
-            XCTAssertEqual(group.children, [first, second])
+            XCTAssertEqual(group.children, [second, first])
             XCTAssertEqual(focus.windowOrNil, second)
             panel.close()
         }
@@ -299,7 +299,7 @@ final class GroupTabReorderTest: XCTestCase {
                 view.rightMouseDragged(with: event(.rightMouseDragged, x: 250, flags: [.control]))
             } else {
                 view.mouseDown(with: event(.leftMouseDown, x: 50, flags: []))
-                view.mouseDragged(with: event(.leftMouseDragged, x: 250, flags: [.control]))
+                view.mouseDragged(with: event(.leftMouseDragged, x: 250, flags: []))
             }
             XCTAssertEqual(group.children, [second, first])
             XCTAssertEqual(focus.windowOrNil, second)
@@ -312,7 +312,7 @@ final class GroupTabReorderTest: XCTestCase {
                 }
             }
             if controlAtMouseDown { view.rightMouseUp(with: event(.rightMouseUp, x: 250, flags: [.control])) }
-            else { view.mouseUp(with: event(.leftMouseUp, x: 250, flags: [.control])) }
+            else { view.mouseUp(with: event(.leftMouseUp, x: 250, flags: [])) }
             XCTAssertEqual(group.children, [second, first])
             panel.close()
         }
