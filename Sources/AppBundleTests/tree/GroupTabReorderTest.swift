@@ -235,13 +235,12 @@ final class GroupTabReorderTest: XCTestCase {
             view.mouseUp(with: event(.leftMouseUp, x: 250, flags: []))
             XCTAssertEqual(group.children, [first, second])
             XCTAssertEqual(focus.windowOrNil, second)
-            if #available(macOS 27.0, *) { XCTAssertFalse(view.nativeTabs!.isHidden) }
             panel.close()
         }
     }
 
-    func testNativeGlassTabsReflectSelectionAndRouteControlDrag() throws {
-        guard #available(macOS 27.0, *) else { throw XCTSkip("Native glass tabs require macOS 27") }
+    func testGlassSurfaceRemainsVisibleDuringControlDrag() throws {
+        guard #available(macOS 26.0, *) else { throw XCTSkip("Glass requires macOS 26") }
         TrayMenuModel.shared.isEnabled = true
         let workspace = Workspace.get(byName: name)
         let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
@@ -256,25 +255,20 @@ final class GroupTabReorderTest: XCTestCase {
         defer { panel.close() }
         let view = bar.tabs
         view.updateGroup(group)
-        let control = try XCTUnwrap(view.nativeTabs)
-        XCTAssertEqual(control.role, .tabs)
-        XCTAssertEqual(control.borderShape, .capsule)
-        XCTAssertEqual(control.segmentCount, 2)
-        XCTAssertEqual(control.selectedSegment, 1)
-        XCTAssertTrue(bar.background.isHidden)
+        let glass = try XCTUnwrap(bar.background as? NSGlassEffectView)
+        XCTAssertTrue(glass.contentView === view)
+        XCTAssertFalse(glass.isHidden)
         func event(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
             NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [.control], timestamp: 0,
                               windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
         }
-        control.mouseDown(with: event(.leftMouseDown, x: 50))
-        control.mouseDragged(with: event(.leftMouseDragged, x: 250))
+        view.mouseDown(with: event(.leftMouseDown, x: 50))
+        view.mouseDragged(with: event(.leftMouseDragged, x: 250))
         XCTAssertEqual(group.children, [second, first])
-        XCTAssertTrue(control.isHidden)
         XCTAssertFalse(bar.background.isHidden)
-        control.mouseUp(with: event(.leftMouseUp, x: 250))
-        XCTAssertFalse(control.isHidden)
-        XCTAssertTrue(bar.background.isHidden)
-        XCTAssertEqual(control.selectedSegment, 0)
+        view.mouseUp(with: event(.leftMouseUp, x: 250))
+        XCTAssertFalse(bar.background.isHidden)
+        XCTAssertEqual(view.activeIndex, 0)
         XCTAssertEqual(focus.windowOrNil, second)
     }
 
@@ -313,10 +307,8 @@ final class GroupTabReorderTest: XCTestCase {
                 let movingTabs = view.subviews.compactMap { $0 as? GroupTabView }
                 XCTAssertEqual(movingTabs.count, 2)
                 for tab in movingTabs {
-                    let pill = try XCTUnwrap(tab.glassPill as? NSSegmentedControl)
-                    XCTAssertEqual(pill.role, .tabs)
-                    XCTAssertFalse(pill.isHidden)
-                    XCTAssertEqual(pill.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
+                    XCTAssertFalse(tab.isHidden)
+                    XCTAssertEqual(tab.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
                 }
             }
             if controlAtMouseDown { view.rightMouseUp(with: event(.rightMouseUp, x: 250, flags: [.control])) }

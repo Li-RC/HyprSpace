@@ -43,11 +43,17 @@ final class GroupBarContrastTest: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(fill), 1, accuracy: 0.001)
     }
 
-    @MainActor func testBarAppliesOppositeAppearanceToNativeAndDraggedGlass() {
+    @MainActor func testBarAppliesContrastingAppearanceAndContentFill() throws {
         let bar = GroupBarView()
         bar.applyContrast(.dark)
         XCTAssertEqual(bar.appearance?.name, .darkAqua)
+        let dark = try XCTUnwrap(bar.tabs.layer?.backgroundColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) })
+        XCTAssertEqual(dark.redComponent, 0, accuracy: 0.001)
+        XCTAssertEqual(dark.alphaComponent, 0.6, accuracy: 0.001)
         bar.applyContrast(.light)
         XCTAssertEqual(bar.appearance?.name, .aqua)
+        let light = try XCTUnwrap(bar.tabs.layer?.backgroundColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) })
+        XCTAssertEqual(light.redComponent, 1, accuracy: 0.001)
+        XCTAssertEqual(light.alphaComponent, 0.6, accuracy: 0.001)
     }
 }

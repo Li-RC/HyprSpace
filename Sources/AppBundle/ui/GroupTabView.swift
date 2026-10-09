@@ -1,50 +1,29 @@
 import AppKit
 
 final class GroupTabView: NSView {
-    var title = "" { didSet { updateGlassPill() } }
-    var selected = false { didSet { updateGlassPill() } }
-    var dragging = false { didSet { updateGlassPill() } }
-    private(set) var glassPill: NSView?
+    var title = "" { didSet { updateTab() } }
+    var selected = false { didSet { updateTab() } }
+    var dragging = false { didSet { updateTab() } }
     var showsDivider = false
+    var onSelect: (() -> Void)?
 
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        if #available(macOS 27.0, *) {
-            let pill = NSSegmentedControl()
-            pill.role = .tabs
-            pill.borderShape = .capsule
-            pill.segmentCount = 1
-            pill.selectedSegment = 0
-            pill.segmentDistribution = .fill
-            pill.font = .systemFont(ofSize: 13, weight: .semibold)
-            glassPill = pill
-        } else if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView()
-            glass.style = .regular
-            glass.cornerRadius = 14
-            let label = NSTextField(labelWithString: "")
-            label.alignment = .center
-            label.lineBreakMode = .byTruncatingTail
-            label.font = .systemFont(ofSize: 13, weight: .semibold)
-            glass.contentView = label
-            glassPill = glass
-        }
-        if let glassPill { addSubview(glassPill) }
-        updateGlassPill()
+        setAccessibilityElement(true)
+        setAccessibilityRole(.radioButton)
     }
 
-    private func updateGlassPill() {
-        if let pill = glassPill as? NSSegmentedControl { pill.setLabel(title, forSegment: 0) }
-        if #available(macOS 26.0, *), let glass = glassPill as? NSGlassEffectView,
-           let label = glass.contentView as? NSTextField { label.stringValue = title }
-        glassPill?.isHidden = !(selected || dragging)
+    private func updateTab() {
+        setAccessibilityLabel(title)
+        setAccessibilityValue(selected)
         needsDisplay = true
     }
 
-    override func layout() {
-        super.layout()
-        glassPill?.frame = bounds.insetBy(dx: 4, dy: 2)
+    override func accessibilityPerformPress() -> Bool {
+        guard let onSelect else { return false }
+        onSelect()
+        return true
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -57,19 +36,12 @@ final class GroupTabView: NSView {
         bounds.fill(using: .copy)
         let tab = bounds.insetBy(dx: 4, dy: 4)
         guard tab.width > 0 else { return }
-        if (selected || dragging) && glassPill != nil { return }
+        let textColor: NSColor = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .white : .black
         if selected || dragging {
             let pill = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
-            NSGraphicsContext.saveGraphicsState()
-            let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-            shadow.shadowBlurRadius = 2
-            shadow.shadowOffset = NSSize(width: 0, height: -1)
-            shadow.set()
-            NSColor.windowBackgroundColor.withAlphaComponent(dragging ? 1 : 0.85).setFill()
+            textColor.withAlphaComponent(dragging ? 0.22 : 0.12).setFill()
             pill.fill()
-            NSGraphicsContext.restoreGraphicsState()
-            NSColor.labelColor.withAlphaComponent(0.10).setStroke()
+            textColor.withAlphaComponent(0.16).setStroke()
             pill.lineWidth = 0.5
             pill.stroke()
         } else if showsDivider {
@@ -84,53 +56,11 @@ final class GroupTabView: NSView {
         paragraph.lineBreakMode = .byTruncatingTail
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13, weight: selected ? .semibold : .medium),
-            .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph,
+            .foregroundColor: textColor, .paragraphStyle: paragraph,
         ]
         let textSize = (title as NSString).size(withAttributes: attributes)
         let textWidth = min(textSize.width, max(0, tab.width - 16))
         (title as NSString).draw(in: NSRect(x: tab.midX - textWidth / 2, y: tab.midY - textSize.height / 2,
                                           width: textWidth, height: textSize.height), withAttributes: attributes)
     }
-}
-
-// Use the same native tab/lens treatment as the Settings navigation bar.
-final class GroupTabControl: NSSegmentedControl {
-    private weak var owner: DecorationView?
-
-    init(owner: DecorationView) {
-        self.owner = owner
-        super.init(frame: .zero)
-        if #available(macOS 27.0, *) { role = .tabs }
-        if #available(macOS 26.0, *) { borderShape = .capsule }
-        segmentDistribution = .fill
-        trackingMode = .selectOne
-        font = .systemFont(ofSize: 13, weight: .medium)
-        focusRingType = .none
-        target = self
-        action = #selector(selectTab)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func update(labels: [String], selectedIndex: Int) {
-        if segmentCount != labels.count { segmentCount = labels.count }
-        for (index, label) in labels.enumerated() where self.label(forSegment: index) != label {
-            setLabel(label, forSegment: index)
-        }
-        if selectedSegment != selectedIndex { selectedSegment = selectedIndex }
-    }
-
-    @objc private func selectTab() {
-        guard let owner, owner.memberIds.indices.contains(selectedSegment) else { return }
-        owner.selectTab(windowId: owner.memberIds[selectedSegment])
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    // Keep native rendering, but let one owner track the gesture from its first event.
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    override func mouseDown(with event: NSEvent) { owner?.mouseDown(with: event) }
-
-    override func mouseDragged(with event: NSEvent) { owner?.mouseDragged(with: event) }
-    override func mouseUp(with event: NSEvent) { owner?.mouseUp(with: event) }
 }

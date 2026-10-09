@@ -109,11 +109,7 @@ final class GroupBarView: NSView {
         background.autoresizingMask = [.width, .height]
         tabs.autoresizingMask = [.width, .height]
         addSubview(background)
-        if #available(macOS 27.0, *) {
-            // The native tab control supplies its own glass while idle.
-            addSubview(tabs)
-            background.isHidden = true
-        } else if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView {
+        if #available(macOS 26.0, *), let glass = background as? NSGlassEffectView {
             glass.contentView = tabs
         } else {
             background.addSubview(tabs)
@@ -136,9 +132,13 @@ final class GroupBarView: NSView {
         guard contrastScheme != scheme else { return }
         contrastScheme = scheme
         appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        wantsLayer = true
-        layer?.cornerRadius = windowGroupBarHeight / 2
-        layer?.backgroundColor = (scheme == .dark ? NSColor.black : NSColor.white).withAlphaComponent(0.18).cgColor
+        // Glass adapts its luminance independently of NSAppearance. Keep a
+        // translucent content fill so labels remain legible on either wallpaper.
+        tabs.wantsLayer = true
+        tabs.layer?.cornerRadius = windowGroupBarHeight / 2
+        tabs.layer?.masksToBounds = true
+        tabs.layer?.backgroundColor = (scheme == .dark ? NSColor.black : NSColor.white).withAlphaComponent(0.6).cgColor
+        tabs.subviews.forEach { $0.needsDisplay = true }
     }
 
     override func layout() {
@@ -193,7 +193,6 @@ final class DecorationView: NSView {
     private var tabDrag: GroupTabDrag?
     private var tabViews: [UInt32: GroupTabView] = [:]
     private var tabTargetFrames: [UInt32: NSRect] = [:]
-    private(set) var nativeTabs: GroupTabControl?
 
     func updateGroup(_ group: TilingContainer) {
         let previousIds = memberIds
@@ -201,18 +200,6 @@ final class DecorationView: NSView {
         members = group.allLeafWindowsRecursive.map { $0.app.name ?? "Window" }
         memberIds = group.allLeafWindowsRecursive.map(\.windowId)
         activeIndex = group.mostRecentWindowRecursive?.ownIndex ?? 0
-        if #available(macOS 27.0, *) {
-            if nativeTabs == nil {
-                let control = GroupTabControl(owner: self)
-                nativeTabs = control
-                addSubview(control)
-            }
-            nativeTabs?.update(labels: members, selectedIndex: activeIndex)
-        }
-        let reordering = tabDrag?.isReordering == true
-        nativeTabs?.isHidden = reordering
-        let bar = unsafe superview as? GroupBarView
-        bar?.background.isHidden = nativeTabs != nil && !reordering
         for id in Array(tabViews.keys) where !memberIds.contains(id) {
             tabViews.removeValue(forKey: id)?.removeFromSuperview()
             tabTargetFrames.removeValue(forKey: id)
@@ -223,7 +210,7 @@ final class DecorationView: NSView {
                 tabViews[id] = view
                 addSubview(view)
             }
-            view.isHidden = nativeTabs != nil && !reordering
+            view.onSelect = { [weak self] in self?.selectTab(windowId: id) }
             view.title = members[index]
             view.selected = index == activeIndex
             view.dragging = tabDrag?.isReordering == true && tabDrag?.windowId == id
@@ -244,7 +231,6 @@ final class DecorationView: NSView {
 
     private func layoutGroupTabs(animate: Bool) {
         guard !memberIds.isEmpty, bounds.width > 0 else { return }
-        nativeTabs?.frame = bounds
         let width = bounds.width / CGFloat(memberIds.count)
         let enabled = animate && config.enableWindowAnimations && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         for (index, id) in memberIds.enumerated() {
