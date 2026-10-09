@@ -12,6 +12,14 @@ final class GroupBarContrastTest: XCTestCase {
         XCTAssertEqual(GroupBarContrast.choose(brightness: 0.8, current: .light), .dark)
     }
 
+    func testMissingWallpaperSamplePreservesLastAppearance() {
+        for scheme in [GroupBarContrast.light, .dark] {
+            let opposite: GroupBarContrast = scheme == .dark ? .light : .dark
+            XCTAssertEqual(GroupBarContrast.choose(brightness: nil, current: scheme, fallback: opposite), scheme)
+            XCTAssertEqual(GroupBarContrast.choose(brightness: nil, current: nil, fallback: scheme), scheme)
+        }
+    }
+
     func testWallpaperAspectFillFitAndSecondaryScreenCoordinates() {
         let screen = NSRect(x: -1000, y: 300, width: 1000, height: 1000)
         let size = CGSize(width: 2000, height: 1000)
@@ -37,6 +45,9 @@ final class GroupBarContrastTest: XCTestCase {
         let lower = try XCTUnwrap(wallpaperBrightness(image, in: NSRect(x: 0, y: 50, width: 800, height: 32), imageFrame: frame, fill: nil))
         XCTAssertGreaterThan(upper, 0.9)
         XCTAssertLessThan(lower, 0.1)
+        // Different local patches must not drive a display-wide appearance.
+        let display = try XCTUnwrap(wallpaperBrightness(image, in: frame, imageFrame: frame, fill: nil))
+        XCTAssertEqual(display, 0.5, accuracy: 0.001)
         XCTAssertEqual(GroupBarContrast.choose(brightness: upper, current: nil), .dark)
         XCTAssertEqual(GroupBarContrast.choose(brightness: lower, current: nil), .light)
         let fill = wallpaperBrightness(image, in: NSRect(x: -200, y: 100, width: 100, height: 32), imageFrame: frame, fill: .white)

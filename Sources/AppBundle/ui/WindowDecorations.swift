@@ -122,9 +122,7 @@ final class GroupBarView: NSView {
 
     func updateContrast(in frame: NSRect) {
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }) else { return }
-        let brightness = GroupBarWallpaper.shared.brightness(in: frame, on: screen)
-        let scheme = brightness.map { GroupBarContrast.choose(brightness: $0, current: contrastScheme) }
-            ?? (AppearanceTheme.current == .dark ? .dark : .light)
+        let scheme = GroupBarWallpaper.shared.contrast(on: screen, fallback: AppearanceTheme.current == .dark ? .dark : .light)
         applyContrast(scheme)
     }
 
