@@ -9,6 +9,43 @@ final class DwindleDropTest: XCTestCase {
         config.enableDwindleTiling = true
         currentlyManipulatedWithMouseWindowId = nil
         TrayMenuModel.shared.isEnabled = true
+        beginWindowMouseGesture(at: CGPoint(x: -10000, y: -10000))
+    }
+
+    func testDraggingAnyWindowEdgeNeverRetilesOnRelease() async throws {
+        let workspace = Workspace.get(byName: name)
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let target = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        try await workspace.layoutWorkspace()
+        let rect = window.lastAppliedLayoutPhysicalRect!
+        let edges = [CGPoint(x: rect.minX, y: rect.center.y), CGPoint(x: rect.maxX, y: rect.center.y),
+                     CGPoint(x: rect.center.x, y: rect.minY), CGPoint(x: rect.center.x, y: rect.maxY),
+                     rect.topLeftCorner, rect.bottomRightCorner]
+        for edge in edges {
+            beginWindowMouseGesture(at: edge)
+            // A move can be delivered before the corresponding resize notification.
+            let moved = Rect(topLeftX: rect.minX + 10, topLeftY: rect.minY + 10, width: rect.width, height: rect.height)
+            recordDwindleMouseMove(window, from: rect, to: moved, mouseButtonDown: true)
+            XCTAssertNil(currentlyManipulatedWithMouseWindowId)
+            XCTAssertNotNil(window.lastAppliedLayoutPhysicalRect)
+            XCTAssertFalse(finishMovingWindowWithMouse(at: target.lastAppliedLayoutPhysicalRect!.center))
+            XCTAssertEqual(workspace.rootTilingContainer.children, [window, target])
+        }
+    }
+
+    func testMoveAfterResizeStillCannotBecomeDrop() async throws {
+        let workspace = Workspace.get(byName: name)
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let target = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        try await workspace.layoutWorkspace()
+        let rect = window.lastAppliedLayoutPhysicalRect!
+        beginWindowMouseGesture(at: CGPoint(x: rect.center.x, y: rect.minY + 20))
+        let resized = Rect(topLeftX: rect.minX + 10, topLeftY: rect.minY, width: rect.width - 10, height: rect.height)
+        recordDwindleMouseMove(window, from: rect, to: resized, mouseButtonDown: true)
+        let moved = Rect(topLeftX: resized.minX + 10, topLeftY: resized.minY, width: resized.width, height: resized.height)
+        recordDwindleMouseMove(window, from: resized, to: moved, mouseButtonDown: true)
+        XCTAssertFalse(finishMovingWindowWithMouse(at: point(.left, in: target.lastAppliedLayoutPhysicalRect!)))
+        XCTAssertEqual(workspace.rootTilingContainer.children, [window, target])
     }
 
     private func point(_ direction: CardinalDirection, in rect: Rect) -> CGPoint {

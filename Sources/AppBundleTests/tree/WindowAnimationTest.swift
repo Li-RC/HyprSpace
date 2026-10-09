@@ -2,6 +2,12 @@
 import XCTest
 
 final class WindowAnimationTest: XCTestCase {
+    func testFrameTimingAccountsForWorkAndSkipsMissedFrames() {
+        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.010, framesPerSecond: 60), 1.0 / 60 - 0.010, accuracy: 0.000001)
+        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.025, framesPerSecond: 60), 2.0 / 60 - 0.025, accuracy: 0.000001)
+        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.010, framesPerSecond: 120), 2.0 / 120 - 0.010, accuracy: 0.000001)
+    }
+
     @MainActor func testAnimationsAreOptIn() {
         XCTAssertFalse(parseConfig("").config.enableWindowAnimations)
         let enabled = parseConfig("enable-window-animations = true")

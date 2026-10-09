@@ -7,13 +7,49 @@ private var moveWithMouseTask: Task<(), any Error>? = nil
 @MainActor
 private var draggedWindowId: UInt32? = nil
 
+@MainActor private var mouseDownPoint: CGPoint?
+@MainActor private var mouseDownRects: [UInt32: Rect] = [:]
+@MainActor private var resizingWindowIds: Set<UInt32> = []
+
+func isWindowEdgeDrag(at point: CGPoint, in rect: Rect) -> Bool {
+    let frame = CGRect(origin: rect.topLeftCorner, size: rect.size)
+    return frame.insetBy(dx: -8, dy: -8).contains(point) && !frame.insetBy(dx: 8, dy: 8).contains(point)
+}
+
+@MainActor
+func beginWindowMouseGesture(at point: CGPoint) {
+    mouseDownPoint = point
+    mouseDownRects.removeAll()
+    resizingWindowIds.removeAll()
+    draggedWindowId = nil
+}
+
+@MainActor
+func recordWindowMouseResize(_ windowId: UInt32) {
+    resizingWindowIds.insert(windowId)
+    if draggedWindowId == windowId { draggedWindowId = nil }
+    DwindleDropPreview.shared.hide()
+}
+
+@MainActor
+private func isWindowResizeGesture(_ window: Window, rect: Rect?) -> Bool {
+    if resizingWindowIds.contains(window.windowId) { return true }
+    guard let point = mouseDownPoint, let rect = mouseDownRects[window.windowId] ?? rect else { return false }
+    mouseDownRects[window.windowId] = rect
+    return isWindowEdgeDrag(at: point, in: rect)
+}
+
 @MainActor
 func recordDwindleMouseMove(_ window: Window, from previous: Rect, to current: Rect, mouseButtonDown: Bool) {
     guard config.enableDwindleTiling, mouseButtonDown,
           window.isFloating || window.parent is TilingContainer,
-          currentlyManipulatedWithMouseWindowId == nil || currentlyManipulatedWithMouseWindowId == window.windowId,
-          abs(current.width - previous.width) < 2, abs(current.height - previous.height) < 2,
-          current.topLeftCorner != previous.topLeftCorner else { return }
+          currentlyManipulatedWithMouseWindowId == nil || currentlyManipulatedWithMouseWindowId == window.windowId else { return }
+    if isWindowResizeGesture(window, rect: previous) ||
+        abs(current.width - previous.width) >= 2 || abs(current.height - previous.height) >= 2 {
+        recordWindowMouseResize(window.windowId)
+        return
+    }
+    guard current.topLeftCorner != previous.topLeftCorner else { return }
     draggedWindowId = window.windowId
     currentlyManipulatedWithMouseWindowId = window.windowId
     window.lastAppliedLayoutPhysicalRect = nil
@@ -24,6 +60,18 @@ func movedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutableR
     let notif = notif as String
     Task.startUnstructured { @MainActor in
         guard let token: RunSessionGuard = .isServerEnabled else { return }
+        // Native dwindle drags only choose a drop target on release. Avoid two
+        // complete AX model refreshes for every mouse-move notification.
+        if config.enableDwindleTiling, isLeftMouseButtonDown,
+           let windowId, let window = Window.get(byId: windowId),
+           focus.windowOrNil == window,
+           let current = nativeDecorationOwnerRect(windowId) {
+            recordDwindleMouseMove(window, from: window.lastAppliedLayoutPhysicalRect ?? current,
+                                  to: current, mouseButtonDown: true)
+            WindowDecorations.shared.captureMouseDrag(windowId: windowId)
+            updateDwindleDragPreview(at: mouseLocation)
+            return
+        }
         guard let windowId, let window = Window.get(byId: windowId), try await isManipulatedWithMouse(window) else {
             scheduleCancellableCompleteRefreshSession(.ax(notif))
             return
@@ -64,6 +112,7 @@ private func moveFloatingWindow(_ window: Window) async throws {
 
 @MainActor
 private func moveTilingWindow(_ window: Window) {
+    if isWindowResizeGesture(window, rect: window.lastAppliedLayoutPhysicalRect) { return }
     draggedWindowId = window.windowId
     currentlyManipulatedWithMouseWindowId = window.windowId
     window.lastAppliedLayoutPhysicalRect = nil
@@ -105,9 +154,13 @@ func finishMovingWindowWithMouse(at point: CGPoint) -> Bool {
     moveWithMouseTask = nil
     defer {
         draggedWindowId = nil
+        mouseDownPoint = nil
+        mouseDownRects.removeAll()
+        resizingWindowIds.removeAll()
         DwindleDropPreview.shared.hide()
     }
-    guard let id = draggedWindowId, let window = Window.get(byId: id) else { return false }
+    guard let id = draggedWindowId, let window = Window.get(byId: id),
+          !isWindowResizeGesture(window, rect: window.lastAppliedLayoutPhysicalRect) else { return false }
     let workspace = point.monitorApproximation.activeWorkspace
     return config.enableDwindleTiling
         ? dropDwindleWindow(window, at: point, in: workspace)

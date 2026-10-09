@@ -56,6 +56,10 @@ enum GlobalObserver {
         nc.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main, using: onNotif)
         nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: onNotif)
 
+        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { _ in
+            MainActor.assumeIsolated { beginWindowMouseGesture(at: mouseLocation) }
+        }
+
         NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { _ in
             // AppKit delivers global mouse monitors on the main thread. Record
             // the drag without waiting for an AX refresh or task scheduling.

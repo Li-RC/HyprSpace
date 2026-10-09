@@ -103,6 +103,67 @@ final class GroupTabReorderTest: XCTestCase {
         XCTAssertEqual(drag.targetIndex, 0)
     }
 
+    func testDraggedTabFollowsPointerAndClampsAtBarEdges() {
+        let bounds = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
+        var drag = GroupTabDrag(windowId: 1, origin: CGPoint(x: 150, y: 16), originalIndex: 1)
+        drag.update(at: CGPoint(x: 175, y: 16), in: bounds, memberCount: 3)
+        XCTAssertEqual(drag.tabOriginX(in: bounds, memberCount: 3), 125)
+        drag.update(at: CGPoint(x: 1000, y: 16), in: bounds, memberCount: 3)
+        XCTAssertEqual(drag.tabOriginX(in: bounds, memberCount: 3), 200)
+        drag.update(at: CGPoint(x: -1000, y: 16), in: bounds, memberCount: 3)
+        XCTAssertEqual(drag.tabOriginX(in: bounds, memberCount: 3), 0)
+    }
+
+    func testTabViewsRetainIdentityAcrossReorderingAndBarResize() {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        let view = DecorationView(frame: NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight))
+        view.updateGroup(group)
+        let firstTab = view.subviews[0]
+        let secondTab = view.subviews[1]
+        XCTAssertTrue(group.reorderWindowGroupMember(first.windowId, to: 1))
+        view.updateGroup(group)
+        XCTAssertTrue(view.subviews.contains { $0 === firstTab })
+        XCTAssertTrue(view.subviews.contains { $0 === secondTab })
+        XCTAssertEqual(firstTab.frame.minX, 150)
+        XCTAssertEqual(secondTab.frame.minX, 0)
+        view.setFrameSize(NSSize(width: 600, height: windowGroupBarHeight))
+        XCTAssertEqual(firstTab.frame.minX, 300)
+        XCTAssertEqual(firstTab.frame.width, 300)
+        XCTAssertEqual(view.memberIds, [second.windowId, first.windowId])
+    }
+
+    func testMouseDragMovesTabContinuouslyAndReleaseSettlesIntoSlot() {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let second = TestWindow.new(id: 2, parent: group)
+        let third = TestWindow.new(id: 3, parent: group)
+        let view = DecorationView(frame: NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight))
+        let panel = NSPanel(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        panel.contentView = view
+        defer { panel.close() }
+        view.updateGroup(group)
+        let tab = view.subviews[0]
+        func event(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: [], timestamp: 0,
+                              windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+        }
+        view.mouseDown(with: event(.leftMouseDown, x: 50))
+        view.mouseDragged(with: event(.leftMouseDragged, x: 175))
+        XCTAssertEqual(tab.frame.minX, 125)
+        XCTAssertEqual(group.children, [second, first, third])
+        // Repeated refreshes must preserve the pointer offset rather than snapping
+        // the dragged tab to the slot selected by the current group order.
+        view.updateGroup(group)
+        XCTAssertEqual(tab.frame.minX, 125)
+        view.mouseUp(with: event(.leftMouseUp, x: 175))
+        XCTAssertEqual(tab.frame.minX, 100)
+        XCTAssertEqual(group.children, [second, first, third])
+    }
+
     func testDraggingUpdatesTreeAndDisplayedOrderBeforeRelease() {
         let workspace = Workspace.get(byName: name)
         let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)

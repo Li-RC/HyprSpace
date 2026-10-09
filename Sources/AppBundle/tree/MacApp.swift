@@ -149,7 +149,7 @@ final class MacApp: AbstractApp {
         }
     }
 
-    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, animate: Bool = false) {
+    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, animate: Bool = false, framesPerSecond: Double = 60) {
         let target = topLeft.flatMap { point in size.map { CGRect(origin: point, size: $0) } }
         // AX notifications can request the same layout again during an animation.
         if animate, let target, frameAnimationTargets[windowId] == target,
@@ -171,21 +171,35 @@ final class MacApp: AbstractApp {
             let began = ProcessInfo.processInfo.systemUptime
             Task.startUnstructured {
                 defer { job.cancel() }
+                var previousFrame = start
                 while !job.isCancelled {
-                    let progress = min(1, (ProcessInfo.processInfo.systemUptime - began) / 0.18)
-                    let frame = animatedWindowFrame(from: start, to: target, progress: progress)
-                    try await thread.runInLoop(.cancellable) { _ in
+                    let previous = previousFrame
+                    let frame = try await thread.runInLoop(.cancellable) { _ -> CGRect? in
                         try job.checkCancellation()
                         guard !isLeftMouseButtonDown, let window = windows.threadGuarded[windowId] else {
                             job.cancel()
-                            return
+                            return nil
                         }
+                        let progress = min(1, (ProcessInfo.processInfo.systemUptime - began) / 0.18)
+                        let frame = animatedWindowFrame(from: start, to: target, progress: progress)
                         try disableAnimations(app: axApp.threadGuarded, job) {
-                            try setFrame(window.ax, frame.origin, frame.size, job)
+                            if progress == 1 {
+                                try setFrame(window.ax, target.origin, target.size, job)
+                            } else {
+                                // Intermediate frames need only the changed attributes;
+                                // retain the full macOS size/position workaround at the end.
+                                if frame.size != previous.size { window.ax.set(Ax.sizeAttr, frame.size) }
+                                if frame.origin != previous.origin { window.ax.set(Ax.topLeftCornerAttr, frame.origin) }
+                            }
                         }
+                        return frame
                     }
-                    if progress == 1 { return }
-                    try await Task.sleep(for: .milliseconds(1000.0 / 60))
+                    guard let frame else { return }
+                    previousFrame = frame
+                    if frame == target { return }
+                    let delay = windowAnimationFrameDelay(elapsed: ProcessInfo.processInfo.systemUptime - began,
+                                                          framesPerSecond: framesPerSecond)
+                    try await Task.sleep(for: .seconds(delay))
                 }
             }
         }

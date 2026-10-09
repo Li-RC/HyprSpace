@@ -37,6 +37,8 @@ Set `enable-window-animations = true` at the top level of your config to try
 to false. Each window finishes a frame update before sending the next one;
 new targets cancel the previous animation, while repeated requests for the
 same target do not restart it.
+Frame scheduling accounts for Accessibility work and the display refresh rate,
+and skips missed frames instead of queuing stale geometry.
 
 Startup, first placement, workspace/group reveals, fullscreen, and direct mouse
 dragging keep immediate placement. macOS Reduce Motion also disables animations.
@@ -56,7 +58,9 @@ shown; other members use AeroSpace's existing offscreen hiding mechanism.
 The bar shows application names on a native Liquid Glass background on macOS 26 and later (material on older macOS),
 with an 8-point gap above the window. Click a tab to switch to that member, or
 cycle members with the keyboard. Drag a tab across another tab to reorder
-the members immediately as you move. The active window stays selected; release
+the members immediately as you move. The dragged tab follows the pointer;
+with `enable-window-animations = true`, neighboring tabs slide into their new
+slots over 140 ms. The active window stays selected; release
 inside the bar to keep the order, or outside to restore the original order.
 
 `group next` and `group prev` wrap through members. `group join-right` (or another
@@ -79,6 +83,8 @@ split. A faint overlay previews the resulting tile while dragging. The outer
 quarter on each side selects left/right; the central area selects top/bottom.
 The narrow border gap also accepts drops. The tree changes on release, so crossing
 tiles does not keep swapping them.
+Dragging a window edge is always treated as resizing, even if macOS reports a
+position change before its resize notification; it never triggers a drop or regroup.
 Dropping a tiled or floating window in a group's center or on its bar joins it;
 dropping near its edges creates a separate tile beside the group. Dragging a member
 to its own group's edge extracts that member.

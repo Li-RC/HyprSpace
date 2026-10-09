@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import PrivateApi
+import QuartzCore
 
 let windowGroupBarHeight: CGFloat = 32
 let windowGroupBarGap: CGFloat = 8
@@ -24,7 +25,11 @@ final class DecorationPanel: NSPanel {
         let frame = isGroupBar
             ? groupBarFrame(rect, primaryScreenHeight: primaryScreenHeight)
             : decorationFrame(rect, primaryScreenHeight: primaryScreenHeight, borderWidth: borderWidth, barHeight: 0)
-        setFrame(frame, display: true)
+        // Let AppKit coalesce resize redraws; native moves can reuse the border's
+        // backing layer instead of forcing a synchronous repaint per notification.
+        let resized = self.frame.size != frame.size
+        setFrame(frame, display: false)
+        if resized { contentView?.needsDisplay = true }
     }
 
     func orderAboveOwner(_ owner: UInt32) {
@@ -124,10 +129,18 @@ struct GroupTabDrag {
     let originalIndex: Int
     var isDragging = false
     var targetIndex: Int?
+    var offsetX: CGFloat = 0
 
     mutating func update(at point: CGPoint, in bounds: NSRect, memberCount: Int) {
         if max(abs(point.x - origin.x), abs(point.y - origin.y)) >= 4 { isDragging = true }
+        offsetX = point.x - origin.x
         targetIndex = isDragging ? groupTabIndex(at: point, in: bounds, memberCount: memberCount) : nil
+    }
+
+    func tabOriginX(in bounds: NSRect, memberCount: Int) -> CGFloat {
+        guard memberCount > 0 else { return bounds.minX }
+        let width = bounds.width / CGFloat(memberCount)
+        return min(bounds.maxX - width, max(bounds.minX, bounds.minX + CGFloat(originalIndex) * width + offsetX))
     }
 
     @MainActor @discardableResult
@@ -151,13 +164,65 @@ final class DecorationView: NSView {
     var memberIds: [UInt32] = []
     weak var group: TilingContainer?
     private var tabDrag: GroupTabDrag?
+    private var tabViews: [UInt32: GroupTabView] = [:]
+    private var tabTargetFrames: [UInt32: NSRect] = [:]
 
     func updateGroup(_ group: TilingContainer) {
+        let previousIds = memberIds
         self.group = group
         members = group.allLeafWindowsRecursive.map { $0.app.name ?? "Window" }
         memberIds = group.allLeafWindowsRecursive.map(\.windowId)
         activeIndex = group.mostRecentWindowRecursive?.ownIndex ?? 0
+        for id in Array(tabViews.keys) where !memberIds.contains(id) {
+            tabViews.removeValue(forKey: id)?.removeFromSuperview()
+            tabTargetFrames.removeValue(forKey: id)
+        }
+        for (index, id) in memberIds.enumerated() {
+            let view = tabViews[id] ?? GroupTabView()
+            if tabViews[id] == nil {
+                tabViews[id] = view
+                addSubview(view)
+            }
+            view.title = members[index]
+            view.selected = index == activeIndex
+            view.dragging = tabDrag?.isDragging == true && tabDrag?.windowId == id
+            view.showsDivider = index > 0 && index - 1 != activeIndex
+            view.needsDisplay = true
+        }
+        if let drag = tabDrag, drag.isDragging, let view = tabViews[drag.windowId] {
+            addSubview(view, positioned: .above, relativeTo: nil)
+        }
+        layoutGroupTabs(animate: previousIds != memberIds)
         needsDisplay = true
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        layoutGroupTabs(animate: false)
+    }
+
+    private func layoutGroupTabs(animate: Bool) {
+        guard !memberIds.isEmpty, bounds.width > 0 else { return }
+        let width = bounds.width / CGFloat(memberIds.count)
+        let enabled = animate && config.enableWindowAnimations && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        for (index, id) in memberIds.enumerated() {
+            guard let view = tabViews[id] else { continue }
+            let dragging = tabDrag?.isDragging == true && tabDrag?.windowId == id
+            let x = dragging ? tabDrag!.tabOriginX(in: bounds, memberCount: memberIds.count) : bounds.minX + CGFloat(index) * width
+            let frame = NSRect(x: x, y: bounds.maxY - windowGroupBarHeight, width: width, height: windowGroupBarHeight)
+            // A normal refresh must not interrupt a neighbor's slide halfway through.
+            guard tabTargetFrames[id] != frame else { continue }
+            tabTargetFrames[id] = frame
+            if enabled && !dragging {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.14
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    view.animator().frame = frame
+                }
+            } else {
+                view.frame = frame
+            }
+        }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -187,7 +252,9 @@ final class DecorationView: NSView {
         drag.update(at: point, in: bounds, memberCount: memberIds.count)
         if drag.isDragging {
             if drag.targetIndex != nil { _ = drag.apply(in: group) } else { _ = drag.cancel(in: group) }
+            tabDrag = nil
             updateGroup(group)
+            layoutGroupTabs(animate: true)
             WindowDecorations.shared.refresh()
             return
         }
@@ -204,10 +271,7 @@ final class DecorationView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         bounds.fill(using: .copy)
-        if !members.isEmpty {
-            drawGroupTabs()
-            return
-        }
+        if !members.isEmpty { return }
         let body = NSRect(x: borderWidth / 2, y: borderWidth / 2,
                           width: bounds.width - borderWidth, height: bounds.height - borderWidth)
         if borderWidth > 0 {
@@ -222,49 +286,6 @@ final class DecorationView: NSView {
         }
     }
 
-    private func drawGroupTabs() {
-        let tabWidth = bounds.width / CGFloat(members.count)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byTruncatingTail
-        for (index, title) in members.enumerated() {
-            let tab = NSRect(x: bounds.minX + CGFloat(index) * tabWidth, y: bounds.maxY - windowGroupBarHeight,
-                             width: tabWidth, height: windowGroupBarHeight).insetBy(dx: 4, dy: 4)
-            guard tab.width > 0 else { continue }
-            let selected = index == activeIndex
-            if selected {
-                let pill = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
-                NSGraphicsContext.saveGraphicsState()
-                let shadow = NSShadow()
-                shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-                shadow.shadowBlurRadius = 2
-                shadow.shadowOffset = NSSize(width: 0, height: -1)
-                shadow.set()
-                NSColor.windowBackgroundColor.withAlphaComponent(0.85).setFill()
-                pill.fill()
-                NSGraphicsContext.restoreGraphicsState()
-                NSColor.labelColor.withAlphaComponent(0.10).setStroke()
-                pill.lineWidth = 0.5
-                pill.stroke()
-            } else if index > 0 && index - 1 != activeIndex {
-                NSColor.labelColor.withAlphaComponent(0.12).setStroke()
-                let divider = NSBezierPath()
-                divider.move(to: CGPoint(x: tab.minX - 4, y: tab.minY + 4))
-                divider.line(to: CGPoint(x: tab.minX - 4, y: tab.maxY - 4))
-                divider.lineWidth = 0.5
-                divider.stroke()
-            }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 13, weight: selected ? .medium : .regular),
-                .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph,
-            ]
-            let textSize = (title as NSString).size(withAttributes: attributes)
-            let textWidth = min(textSize.width, max(0, tab.width - 16))
-            (title as NSString).draw(in: NSRect(x: tab.midX - textWidth / 2, y: tab.midY - textSize.height / 2,
-                                               width: textWidth, height: textSize.height),
-                                    withAttributes: attributes)
-        }
-
-    }
 }
 
 @MainActor
@@ -305,6 +326,7 @@ final class WindowDecorations {
             return
         }
         guard let rect = nativeDecorationOwnerRect(windowId) else { return }
+        if event == 807 && isLeftMouseButtonDown { recordWindowMouseResize(windowId) }
         if event == 806 {
             captureMouseDrag(windowId: windowId)
             if config.enableDwindleTiling { updateDwindleDragPreview(at: mouseLocation) }

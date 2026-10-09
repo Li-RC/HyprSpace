@@ -13,6 +13,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
             scheduleCancellableCompleteRefreshSession(.ax(notif))
             return
         }
+        recordWindowMouseResize(window.windowId)
         resizeWithMouseTask?.cancel()
         resizeWithMouseTask = Task.startUnstructured {
             try checkCancellation()

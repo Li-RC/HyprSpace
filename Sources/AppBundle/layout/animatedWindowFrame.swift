@@ -1,5 +1,10 @@
 import AppKit
 
+func windowAnimationFrameDelay(elapsed: Double, framesPerSecond: Double) -> Double {
+    let rate = max(1, framesPerSecond)
+    return (floor(elapsed * rate) + 1) / rate - elapsed
+}
+
 func animatedWindowFrame(from start: CGRect, to target: CGRect, progress: Double) -> CGRect {
     let t = CGFloat(min(1, max(0, progress)))
     let eased = 1 - pow(1 - t, 3)
