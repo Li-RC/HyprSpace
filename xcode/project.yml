@@ -30,13 +30,20 @@ targets:
     deploymentTarget: "13.0"
     sources:
       - "../Sources/AeroSpaceApp"
-      - "../resources"
+      - path: "../resources"
+        excludes:
+          - "AppIcon.icon"
+      - path: "../resources/AppIcon.icon"
+        type: file
+        buildPhase: resources
       - "../docs/config-examples/default-config.toml"
     dependencies:
       - package: AeroSpacePackage
         product: AppBundle
     # https://developer.apple.com/documentation/xcode/build-settings-reference
     settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Debug:
           PRODUCT_NAME: AeroSpace-Debug

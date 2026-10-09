@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AD81648593DB4AAB9109A601 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = AD81648593DB4AAB9109A602 /* AppIcon.icon */; };
 		238EF26CAAADD1FE11312D7C /* default-config.toml in Resources */ = {isa = PBXBuildFile; fileRef = 8FE45A887100EB70912B07F0 /* default-config.toml */; };
 		852F88894A3B9FC385563665 /* AppBundle in Frameworks */ = {isa = PBXBuildFile; productRef = 018E55979F61DA6DA6DCB442 /* AppBundle */; };
 		883A44C8295FECF49F94269D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84C35D8E25B61D4D1ADB1851 /* Assets.xcassets */; };
@@ -14,6 +15,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AD81648593DB4AAB9109A602 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		09685297933511208058F7CF /* AeroSpace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AeroSpace.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		18C104E927E079E60C91AE3E /* AeroSpaceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AeroSpaceApp.swift; sourceTree = "<group>"; };
 		226D545E20A3CF547088F832 /* aerospace-package-symlink */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "aerospace-package-symlink"; path = "aerospace-package-symlink"; sourceTree = SOURCE_ROOT; };
@@ -46,6 +48,7 @@
 		21E15F84087042E63C0150AB /* resources */ = {
 			isa = PBXGroup;
 			children = (
+				AD81648593DB4AAB9109A602 /* AppIcon.icon */,
 				CF85755BFF66B59A84F98262 /* AeroSpace.entitlements */,
 				84C35D8E25B61D4D1ADB1851 /* Assets.xcassets */,
 			);
@@ -150,6 +153,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD81648593DB4AAB9109A601 /* AppIcon.icon in Resources */,
 				883A44C8295FECF49F94269D /* Assets.xcassets in Resources */,
 				238EF26CAAADD1FE11312D7C /* default-config.toml in Resources */,
 			);
