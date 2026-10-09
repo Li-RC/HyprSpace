@@ -1,13 +1,8 @@
 @testable import AppBundle
 import XCTest
+import AppKit
 
 final class WindowAnimationTest: XCTestCase {
-    func testFrameTimingAccountsForWorkAndSkipsMissedFrames() {
-        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.010, framesPerSecond: 60), 1.0 / 60 - 0.010, accuracy: 0.000001)
-        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.025, framesPerSecond: 60), 2.0 / 60 - 0.025, accuracy: 0.000001)
-        XCTAssertEqual(windowAnimationFrameDelay(elapsed: 0.010, framesPerSecond: 120), 2.0 / 120 - 0.010, accuracy: 0.000001)
-    }
-
     @MainActor func testAnimationsAreOptIn() {
         XCTAssertFalse(parseConfig("").config.enableWindowAnimations)
         let enabled = parseConfig("enable-window-animations = true")
@@ -20,10 +15,10 @@ final class WindowAnimationTest: XCTestCase {
         let start = CGRect(x: -1200, y: -200, width: 800, height: 600)
         let target = CGRect(x: 300, y: 100, width: 500, height: 400)
         for progress in [-1.0, 0] {
-            XCTAssertEqual(animatedWindowFrame(from: start, to: target, progress: progress), start)
+            XCTAssertEqual(WindowFrameAnimation(from: start, to: target, at: 0).frame(at: progress * WindowFrameAnimation.duration), start)
         }
         for progress in [1.0, 2] {
-            XCTAssertEqual(animatedWindowFrame(from: start, to: target, progress: progress), target)
+            XCTAssertEqual(WindowFrameAnimation(from: start, to: target, at: 0).frame(at: progress * WindowFrameAnimation.duration), target)
         }
     }
 
@@ -32,7 +27,7 @@ final class WindowAnimationTest: XCTestCase {
         let target = CGRect(x: 200, y: -100, width: 400, height: 700)
         var previous = start
         for step in 1 ... 60 {
-            let frame = animatedWindowFrame(from: start, to: target, progress: Double(step) / 60)
+            let frame = WindowFrameAnimation(from: start, to: target, at: 0).frame(at: Double(step) / 60 * WindowFrameAnimation.duration)
             XCTAssertGreaterThanOrEqual(frame.minX, previous.minX)
             XCTAssertLessThanOrEqual(frame.minX, target.minX)
             XCTAssertLessThanOrEqual(frame.minY, previous.minY)
@@ -44,5 +39,89 @@ final class WindowAnimationTest: XCTestCase {
             previous = frame
         }
         XCTAssertEqual(previous, target)
+    }
+
+    func testRetargetPreservesPositionAndVelocityAndSettlesExactly() {
+        let start = CGRect(x: 100, y: 200, width: 800, height: 600)
+        let target = CGRect(x: 500, y: 100, width: 1000, height: 400)
+        let first = WindowFrameAnimation(from: start, to: target, at: 10)
+        let time = 10.06
+        let position = first.frame(at: time)
+        let next = WindowFrameAnimation(from: position, to: start, at: time, replacing: first)
+        XCTAssertEqual(next.frame(at: time), position)
+        XCTAssertEqual(next.velocity(at: time), first.velocity(at: time))
+        // Compare visible displacement around the retarget, independent of the derivative helper.
+        let delta = 0.00001
+        let before = first.frame(at: time - delta)
+        let after = next.frame(at: time + delta)
+        XCTAssertEqual((position.origin.x - before.origin.x) / delta,
+                       (after.origin.x - position.origin.x) / delta, accuracy: 2)
+        XCTAssertEqual((position.width - before.width) / delta,
+                       (after.width - position.width) / delta, accuracy: 2)
+        XCTAssertEqual(next.frame(at: time + 1), start)
+        XCTAssertEqual(next.velocity(at: time + 1), .zero)
+    }
+
+    func testExpiredAnimationDoesNotCarryStaleVelocity() {
+        let start = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let target = CGRect(x: 100, y: 0, width: 200, height: 100)
+        let previous = WindowFrameAnimation(from: start, to: target, at: 0)
+        let next = WindowFrameAnimation(from: target, to: start, at: 1, replacing: previous)
+        XCTAssertEqual(next.velocity(at: 1), .zero)
+        XCTAssertEqual(next.frame(at: 2), start)
+    }
+
+    @MainActor func testDisplayClockStopsAfterCancellation() async throws {
+        let ticked = expectation(description: "Received display ticks")
+        var count = 0
+        let clock = DisplayFrameClock(screen: NSScreen.main) {
+            count += 1
+            if count == 2 { ticked.fulfill() }
+        }
+        defer { clock.stop() }
+        await fulfillment(of: [ticked], timeout: 2)
+        clock.stop()
+        let stoppedCount = count
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(count, stoppedCount)
+    }
+
+    @MainActor func testFallbackClockCanPauseResumeAndStop() async throws {
+        let ticked = expectation(description: "Fallback ticks")
+        var count = 0
+        let clock = DisplayFrameClock(screen: nil) {
+            count += 1
+            if count == 2 { ticked.fulfill() }
+        }
+        defer { clock.stop() }
+        await fulfillment(of: [ticked], timeout: 2)
+        clock.setPaused(true)
+        let pausedCount = count
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(count, pausedCount)
+        clock.setPaused(false)
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertGreaterThan(count, pausedCount)
+        clock.stop()
+        let stoppedCount = count
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(count, stoppedCount)
+    }
+
+    @MainActor func testSlowAnimationConsumerSkipsOldTicksAndOtherConsumerSurvivesCancellation() async throws {
+        let frame = CGRect(x: 100, y: 100, width: 200, height: 200)
+        let (stopFirst, first) = DisplayFrameClock.frames(for: frame)
+        let (stopSecond, second) = DisplayFrameClock.frames(for: frame)
+        defer { stopFirst(); stopSecond() }
+        var firstTicks = first.makeAsyncIterator()
+        var secondTicks = second.makeAsyncIterator()
+        let initial = await firstTicks.next()!
+        try await Task.sleep(for: .milliseconds(100))
+        let latest = await firstTicks.next()!
+        XCTAssertGreaterThan(latest - initial, 0.05)
+        stopFirst()
+        let remainingTick = await secondTicks.next()
+        XCTAssertNotNil(remainingTick)
+        stopSecond()
     }
 }

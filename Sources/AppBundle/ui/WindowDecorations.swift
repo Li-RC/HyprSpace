@@ -27,6 +27,7 @@ final class DecorationPanel: NSPanel {
             : decorationFrame(rect, primaryScreenHeight: primaryScreenHeight, borderWidth: borderWidth, barHeight: 0)
         // Let AppKit coalesce resize redraws; native moves can reuse the border's
         // backing layer instead of forcing a synchronous repaint per notification.
+        guard self.frame != frame else { return }
         let resized = self.frame.size != frame.size
         setFrame(frame, display: false)
         if resized { contentView?.needsDisplay = true }
@@ -295,6 +296,8 @@ final class WindowDecorations {
     private var bars: [UInt32: DecorationPanel] = [:]
     private var observedOwners: Set<UInt32> = []
     private var ownerFrames: [UInt32: Rect] = [:]
+    private var pendingOwners: [UInt32: NSScreen] = [:]
+    private var frameClocks: [NSScreen: DisplayFrameClock] = [:]
 
     private func updateObservedOwners(_ owners: Set<UInt32>) {
         guard owners != observedOwners else { return }
@@ -322,15 +325,39 @@ final class WindowDecorations {
             panels.removeValue(forKey: windowId)?.close()
             bars.removeValue(forKey: windowId)?.close()
             ownerFrames.removeValue(forKey: windowId)
+            pendingOwners.removeValue(forKey: windowId)
             updateObservedOwners(observedOwners.subtracting([windowId]))
             return
         }
-        guard let rect = nativeDecorationOwnerRect(windowId) else { return }
         if event == 807 && isLeftMouseButtonDown { recordWindowMouseResize(windowId) }
-        if event == 806 {
-            captureMouseDrag(windowId: windowId)
-            if config.enableDwindleTiling { updateDwindleDragPreview(at: mouseLocation) }
+        guard let previous = ownerFrames[windowId],
+              let screen = DisplayFrameClock.screen(for: CGRect(origin: previous.topLeftCorner, size: previous.size)) else { return }
+        pendingOwners[windowId] = screen
+        if frameClocks[screen] == nil {
+            frameClocks[screen] = DisplayFrameClock(screen: screen) { [weak self] in
+                self?.flushOwnerChanges(on: screen)
+            }
         }
+        frameClocks[screen]?.setPaused(false)
+    }
+
+    private func flushOwnerChanges(on screen: NSScreen) {
+        let ids = pendingOwners.filter { $0.value == screen }.map(\.key)
+        for id in ids {
+            pendingOwners.removeValue(forKey: id)
+            guard observedOwners.contains(id) else { continue }
+            applyOwnerChange(windowId: id)
+        }
+        frameClocks[screen]?.setPaused(true)
+    }
+
+    private func applyOwnerChange(windowId: UInt32) {
+        guard let rect = nativeDecorationOwnerRect(windowId) else { return }
+        if let previous = ownerFrames[windowId], let window = Window.get(byId: windowId),
+           focus.windowOrNil == window || window.app.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier {
+            recordDwindleMouseMove(window, from: previous, to: rect, mouseButtonDown: isLeftMouseButtonDown)
+        }
+        if config.enableDwindleTiling { updateDwindleDragPreview(at: mouseLocation) }
         ownerFrames[windowId] = rect
         if let panel = panels[windowId] {
             panel.followOwner(rect, primaryScreenHeight: mainMonitorInfo.height,
@@ -342,6 +369,9 @@ final class WindowDecorations {
     }
 
     func hideAll() {
+        frameClocks.values.forEach { $0.stop() }
+        frameClocks.removeAll()
+        pendingOwners.removeAll()
         DwindleDropPreview.shared.hide()
         panels.values.forEach { $0.close() }
         panels.removeAll()
@@ -413,6 +443,11 @@ final class WindowDecorations {
         for id in Array(panels.keys) where !visibleIds.contains(id) { panels.removeValue(forKey: id)?.close() }
         for id in Array(bars.keys) where !visibleBars.contains(id) { bars.removeValue(forKey: id)?.close() }
         ownerFrames = ownerFrames.filter { trackingOwners.contains($0.key) }
+        pendingOwners = pendingOwners.filter { trackingOwners.contains($0.key) }
+        if trackingOwners.isEmpty {
+            frameClocks.values.forEach { $0.stop() }
+            frameClocks.removeAll()
+        }
         updateObservedOwners(trackingOwners)
     }
 }

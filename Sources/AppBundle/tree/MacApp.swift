@@ -149,7 +149,7 @@ final class MacApp: AbstractApp {
         }
     }
 
-    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, animate: Bool = false, framesPerSecond: Double = 60) {
+    func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, animate: Bool = false) {
         let target = topLeft.flatMap { point in size.map { CGRect(origin: point, size: $0) } }
         // AX notifications can request the same layout again during an animation.
         if animate, let target, frameAnimationTargets[windowId] == target,
@@ -159,6 +159,7 @@ final class MacApp: AbstractApp {
         setFrameJobs[windowId] = withWindowAsync(windowId, .cancellable) { [axApp, windows] window, job in
             guard animate, let target,
                   let rect = try? AppBundle.getAxRect(window: window, job: job) else {
+                windows.threadGuarded[windowId]?.frameAnimation = nil
                 defer { job.cancel() }
                 try disableAnimations(app: axApp.threadGuarded, job) {
                     try setFrame(window, topLeft, size, job)
@@ -166,24 +167,37 @@ final class MacApp: AbstractApp {
                 return
             }
             let start = CGRect(origin: rect.topLeftCorner, size: rect.size)
-            if start == target { job.cancel(); return }
+            if start == target {
+                windows.threadGuarded[windowId]?.frameAnimation = nil
+                job.cancel()
+                return
+            }
             let thread = Thread.current
-            let began = ProcessInfo.processInfo.systemUptime
+            let animation = WindowFrameAnimation(from: start, to: target, at: ProcessInfo.processInfo.systemUptime,
+                                                  replacing: windows.threadGuarded[windowId]?.frameAnimation)
+            windows.threadGuarded[windowId]?.frameAnimation = animation
+            // Cache this read for the animation; restore the flag around each write
+            // so overlapping windows and cancellation cannot leave it disabled.
+            let nativeAnimationsEnabled = axApp.threadGuarded.get(Ax.enhancedUserInterfaceAttr) == true
             Task.startUnstructured {
                 defer { job.cancel() }
+                let (stopTicks, ticks) = await DisplayFrameClock.frames(for: target)
+                defer { Task { @MainActor in stopTicks() } }
                 var previousFrame = start
-                while !job.isCancelled {
+                for await _ in ticks {
+                    if job.isCancelled { return }
                     let previous = previousFrame
                     let frame = try await thread.runInLoop(.cancellable) { _ -> CGRect? in
                         try job.checkCancellation()
                         guard !isLeftMouseButtonDown, let window = windows.threadGuarded[windowId] else {
+                            windows.threadGuarded[windowId]?.frameAnimation = nil
                             job.cancel()
                             return nil
                         }
-                        let progress = min(1, (ProcessInfo.processInfo.systemUptime - began) / 0.18)
-                        let frame = animatedWindowFrame(from: start, to: target, progress: progress)
-                        try disableAnimations(app: axApp.threadGuarded, job) {
-                            if progress == 1 {
+                        let frame = animation.frame(at: ProcessInfo.processInfo.systemUptime)
+                        try disableAnimations(app: axApp.threadGuarded, job, wasEnabled: nativeAnimationsEnabled) {
+                            if frame == target {
+                                window.frameAnimation = nil
                                 try setFrame(window.ax, target.origin, target.size, job)
                             } else {
                                 // Intermediate frames need only the changed attributes;
@@ -197,9 +211,6 @@ final class MacApp: AbstractApp {
                     guard let frame else { return }
                     previousFrame = frame
                     if frame == target { return }
-                    let delay = windowAnimationFrameDelay(elapsed: ProcessInfo.processInfo.systemUptime - began,
-                                                          framesPerSecond: framesPerSecond)
-                    try await Task.sleep(for: .seconds(delay))
                 }
             }
         }
@@ -413,6 +424,7 @@ final class MacApp: AbstractApp {
 private final class AxWindow {
     let windowId: UInt32
     let ax: AXUIElement
+    var frameAnimation: WindowFrameAnimation?
     // periphery:ignore
     private let axSubscriptions: [AxSubscription] // keep subscriptions in memory
 
@@ -473,8 +485,8 @@ private func setFrame(_ window: AXUIElement, _ topLeft: CGPoint?, _ size: CGSize
 // Some undocumented magic
 // References: https://github.com/koekeishiya/yabai/commit/3fe4c77b001e1a4f613c26f01ea68c0f09327f3a
 //             https://github.com/rxhanson/Rectangle/pull/285
-private func disableAnimations<T>(app: AXUIElement, _ job: RunLoopJob, _ body: () throws -> T) throws -> T {
-    let wasEnabled = app.get(Ax.enhancedUserInterfaceAttr) == true
+private func disableAnimations<T>(app: AXUIElement, _ job: RunLoopJob, wasEnabled cached: Bool? = nil, _ body: () throws -> T) throws -> T {
+    let wasEnabled = cached ?? (app.get(Ax.enhancedUserInterfaceAttr) == true)
     if wasEnabled {
         app.set(Ax.enhancedUserInterfaceAttr, false)
     }

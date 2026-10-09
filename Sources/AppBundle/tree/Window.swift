@@ -46,8 +46,7 @@ open class Window: TreeNode, Hashable {
         if let window = self as? MacWindow {
             window.macApp.setAxFrame(windowId, topLeft, size, animate: config.enableWindowAnimations &&
                 !window.skipNextTilingAnimation && !isStartup && !isHiddenInCorner && !isLeftMouseButtonDown &&
-                !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
-                framesPerSecond: Double(NSScreen.main?.maximumFramesPerSecond ?? 60))
+                !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
             window.skipNextTilingAnimation = false
         } else {
             setAxFrame(topLeft, size)
