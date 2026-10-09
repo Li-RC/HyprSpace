@@ -57,6 +57,45 @@ final class DwindleDropTest: XCTestCase {
         }
     }
 
+    func testFloatingDragReleaseKeepsPositionOverTilesAndGroups() async throws {
+        let workspace = Workspace.get(byName: name)
+        XCTAssertTrue(workspace.focusWorkspace())
+        XCTAssertTrue(mainMonitorInfo.setActiveWorkspace(workspace))
+        let member = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = member.createWindowGroup()
+        let active = TestWindow.new(id: 2, parent: group)
+        let tile = TestWindow.new(id: 3, parent: workspace.rootTilingContainer)
+        let previous = Rect(topLeftX: 100, topLeftY: 100, width: 300, height: 200)
+        let current = Rect(topLeftX: 200, topLeftY: 200, width: 300, height: 200)
+        let dragged = TestWindow.new(id: 4, parent: workspace.floatingWindowsContainer, rect: current)
+        try await workspace.layoutWorkspace()
+        let groupRect = group.lastAppliedLayoutPhysicalRect!
+        let releases = [point(.left, in: tile.lastAppliedLayoutPhysicalRect!), groupRect.center,
+                        CGPoint(x: groupRect.center.x, y: groupRect.minY + windowGroupBarHeight / 2)]
+        for dwindle in [true, false] {
+            for release in releases {
+                beginWindowMouseGesture(at: previous.center)
+                config.enableDwindleTiling = true
+                recordDwindleMouseMove(dragged, from: previous, to: current, mouseButtonDown: true)
+                XCTAssertEqual(currentlyManipulatedWithMouseWindowId, dragged.windowId)
+                config.enableDwindleTiling = dwindle
+                let appliedFrames = dragged.appliedFrames
+                XCTAssertFalse(finishMovingWindowWithMouse(at: release))
+                currentlyManipulatedWithMouseWindowId = nil
+                workspace.normalizeContainers()
+                try await workspace.layoutWorkspace()
+                XCTAssertTrue(dragged.isFloating)
+                XCTAssertTrue(dragged.parent === workspace.floatingWindowsContainer)
+                XCTAssertEqual(group.children, [member, active])
+                XCTAssertEqual(workspace.rootTilingContainer.children, [group, tile])
+                XCTAssertEqual(dragged.appliedFrames, appliedFrames)
+                let rect = try await dragged.getAxRect(.cancellable)
+                XCTAssertEqual(rect?.topLeftCorner, current.topLeftCorner)
+                XCTAssertEqual(rect?.size, current.size)
+            }
+        }
+    }
+
     func testNativeDragThenReleaseCreatesSideBySideAfterInterveningLayout() async throws {
         let workspace = Workspace.get(byName: name)
         workspace.rootTilingContainer.changeOrientation(.v)

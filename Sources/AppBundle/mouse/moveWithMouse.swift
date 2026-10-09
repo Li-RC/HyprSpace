@@ -160,6 +160,7 @@ func finishMovingWindowWithMouse(at point: CGPoint) -> Bool {
         DwindleDropPreview.shared.hide()
     }
     guard let id = draggedWindowId, let window = Window.get(byId: id),
+          !window.isFloating,
           !isWindowResizeGesture(window, rect: window.lastAppliedLayoutPhysicalRect) else { return false }
     let workspace = point.monitorApproximation.activeWorkspace
     return config.enableDwindleTiling
@@ -232,7 +233,7 @@ func dwindleDropTarget(_ window: Window, at point: CGPoint, in workspace: Worksp
 
 @MainActor
 func updateDwindleDragPreview(at point: CGPoint) {
-    guard isLeftMouseButtonDown, let id = draggedWindowId, let window = Window.get(byId: id) else {
+    guard isLeftMouseButtonDown, let id = draggedWindowId, let window = Window.get(byId: id), !window.isFloating else {
         DwindleDropPreview.shared.hide()
         return
     }
