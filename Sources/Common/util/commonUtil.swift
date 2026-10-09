@@ -61,7 +61,7 @@ public func dieT<T>(
             filenameIfConsoleApp: recursionDetectorDuringTermination
                 ? "aerospace-runtime-error-recursion.txt"
                 : "aerospace-runtime-error.txt",
-            title: "AeroSpace Runtime Error",
+            title: "HyprSpace Runtime Error",
             message: message,
         )
     }

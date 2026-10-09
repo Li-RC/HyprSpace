@@ -2,7 +2,7 @@
 include::util/man-attributes.adoc[]
 :manname: aerospace-run-callback
 // tag::purpose[]
-:manpurpose: Run AeroSpace config callbacks on demand
+:manpurpose: Run HyprSpace config callbacks on demand
 // end::purpose[]
 
 // =========================================================== Synopsis
@@ -20,7 +20,7 @@ aerospace run-callback [-h|--help] (on-focus-changed|on-focused-monitor-changed)
 // tag::body[]
 {manpurpose}
 
-The command lets you manually re-run callbacks that AeroSpace normally invokes in response to events:
+The command lets you manually re-run callbacks that HyprSpace normally invokes in response to events:
 
 * `on-window-detected` - callbacks defined by `on-window-detected` config option.
   By default the callbacks are run for the focused window only.

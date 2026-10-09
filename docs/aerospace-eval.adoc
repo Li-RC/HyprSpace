@@ -2,7 +2,7 @@
 include::util/man-attributes.adoc[]
 :manname: aerospace-eval
 // tag::purpose[]
-:manpurpose: Send multiple commands to AeroSpace at once
+:manpurpose: Send multiple commands to HyprSpace at once
 // end::purpose[]
 
 // =========================================================== Synopsis
@@ -31,7 +31,7 @@ If not supplied, stdin is ignored.
 // =========================================================== Arguments
 include::./util/conditional-arguments-header.adoc[]
 
-<aerospace-shell-expr>:: This argument is AeroSpace's shell expression.
+<aerospace-shell-expr>:: This argument is HyprSpace's shell expression.
 See https://nikitabobko.github.io/AeroSpace/guide#shell for more info.
 
 // =========================================================== Examples

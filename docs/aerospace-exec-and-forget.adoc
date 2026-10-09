@@ -34,7 +34,7 @@ In the above example, `exec-and-forget` is percieved as String suffix and simply
 The remaining ` open -n /System/Applications/Utilities/Terminal.app` is passed as-is to `/bin/bash -c '<bash-script>'`
 
 * The command is available in config
-* The command is available *neither* in CLI, *nor* in AeroSpace shell (see: https://nikitabobko.github.io/AeroSpace/guide#shell)
+* The command is available *neither* in CLI, *nor* in HyprSpace shell (see: https://nikitabobko.github.io/AeroSpace/guide#shell)
 
 // end::body[]
 

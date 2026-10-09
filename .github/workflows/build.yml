@@ -60,10 +60,15 @@ jobs:
       - run: swiftly run swift --version
       - name: './build-release.sh'
         run: |
-          # "-" means "Sign to run locally". There is no aerospace-codesign-certificate on GH Actions
+          # "-" means "Sign to run locally". HyprSpace CI uses ad-hoc signing
           ./build-release.sh --codesign-identity -
-          brew trust nikitabobko/tap
-          ./install-from-sources.sh --dont-rebuild
       - name: cat ./.release/xcodebuild.log
         if: ${{ always() }}
         run: 'if test -f ./.release/xcodebuild.log; then cat ./.release/xcodebuild.log; fi'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HyprSpace-${{ matrix.os }}
+          path: |
+            .release/HyprSpace-v*.zip
+            .release/HyprSpace-v*.dmg
+            .release/HyprSpace-v*.sha256

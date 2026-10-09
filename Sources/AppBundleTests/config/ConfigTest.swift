@@ -27,6 +27,9 @@ final class ConfigTest: XCTestCase {
         let result = parseConfig(toml)
         assertEquals(result.errors, [])
         assertEquals(result.warnings, [])
+        assertTrue(result.config.enableDwindleTiling)
+        assertTrue(result.config.windowBorders.enabled)
+        assertEquals(Array(result.config.persistentWorkspaces), (1 ... 10).map { String($0) })
     }
 
     func testConfigVersionOutOfBounds() {

@@ -3,6 +3,10 @@
 
 name: AeroSpace
 
+options:
+  # XcodeGen 2.45.3 uses the legacy .icon type; Xcode needs the Icon Composer type.
+  postGenCommand: "sed -i '' 's/lastKnownFileType = wrapper.icon;/lastKnownFileType = folder.iconcomposer.icon;/' AeroSpace.xcodeproj/project.pbxproj"
+
 packages:
   AeroSpacePackage:
     path: aerospace-package-symlink
@@ -46,10 +50,10 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Debug:
-          PRODUCT_NAME: AeroSpace-Debug
+          PRODUCT_NAME: HyprSpace-Debug
           PRODUCT_BUNDLE_IDENTIFIER: bobko.aerospace.debug
         Release:
-          PRODUCT_NAME: AeroSpace
+          PRODUCT_NAME: HyprSpace
           PRODUCT_BUNDLE_IDENTIFIER: bobko.aerospace
           SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
           GCC_TREAT_WARNINGS_AS_ERRORS: YES

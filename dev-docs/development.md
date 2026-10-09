@@ -1,86 +1,57 @@
-# Development Notes
+# HyprSpace development
 
-To build/install from sources do the following:
-1. Install dependencies
-2. Create codesign certificate in `Keychain Access.app`
-3. Run one of the entry point scripts to build/install from sources
+HyprSpace retains the `AeroSpace` Xcode target, `AeroSpaceApp` SwiftPM executable, `aerospace` CLI, and `bobko.aerospace` bundle identifier for compatibility. The app products are **HyprSpace.app** and **HyprSpace-Debug.app**.
 
-If you struggle to build AeroSpace locally, you can also refer to [builds in GitHub Actions](https://github.com/nikitabobko/AeroSpace/actions?query=branch%3Amain)
+## Requirements
 
-## Definitions
+Use full Xcode with a Swift 6.4 toolchain matching `.swift-version`. The app deployment target is macOS 13.0. The shell wrappers additionally require Bash 5 and swiftly; release documentation and completion generation use Ruby/Bundler, Rust, and fish. See `script/install-dep.sh` for pinned build dependencies.
 
-**SPM.** Swift package manager and Swift build tool. In other words, `swift` CLI tool
+## Build and test
 
-## 1. Install dependencies
+With a matching Xcode toolchain, these commands avoid the wrappers' separate dependencies:
 
-1.  Install Xcode from App Store https://apps.apple.com/us/app/xcode/id497799835
-2.  Install [swiftly](https://github.com/swiftlang/swiftly).
-    Swiftly is a Swift toolchain manager that will make sure that you use the same swift version as written in `.swift-version` file.
-    `brew install swiftly`
-3.  If you want to build shell completion, install rust, bash and fish
-    -   Install Rust using rustup. https://www.rust-lang.org/tools/install
-    -   `brew install bash fish`
-4.  If you want to build man pages, install Ruby >= 3.0. I recommend using [rbenv](https://github.com/rbenv/rbenv).
-    -   `rbenv install 3.3.4` (or whatever 3.x version)
-    -   Install asciidoctor using Ruby `bundler`. `cd AeroSpace && bundler install`
-5.  Install optional `xcbeautify` to make Xcode build logs readable. `brew install xcbeautify`
+```sh
+swift test
+hyprspace_sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+swift build -Xlinker -platform_version -Xlinker macos -Xlinker 13.0 -Xlinker "$hyprspace_sdk_version"
+.build/debug/AeroSpaceApp --config-path docs/config-examples/hyprspace-dwindle.toml
+```
 
-## 2. Create codesign certificate
+Quit the installed window manager before running a development instance. Grant Accessibility permission to the process hosting the app. The SDK flags enable the current macOS appearance while preserving the deployment target.
 
-If you want to run AeroSpace as App Bundle (AeroSpace.app) you need to create self-signed certificate that will be used to codesign AeroSpace.
-Release artifact is built as App Bundle.
-If you only plan to build the debug version of AeroSpace, you can run it from the terminal and custom certificate is not required.
+For an app bundle:
 
-1.  Open `Keychain Access.app`
-2.  Menu -> `Keychain Access` -> `Certificate Assistance` -> `Create a Certificate...`
-    -   Name: `aerospace-codesign-certificate`
-    -   Identity Type: `Self-Signed Root`
-    -   Certificate Type: `Code Signing`
+```sh
+xcodebuild -project xcode/AeroSpace.xcodeproj -scheme AeroSpace -configuration Debug \
+  -derivedDataPath .build/app CODE_SIGNING_ALLOWED=NO build
+```
 
-## 3. Entry point scripts
+The app is `.build/app/Build/Products/Debug/HyprSpace-Debug.app`. Sign a bundle before distributing it; ad-hoc signing does not provide Developer ID trust or notarization.
 
-**Debug build**
--   `build-debug.sh` - Build debug build to `.debug` dir by using SPM. (Xcode is not involved)
--   `test.sh` - Run tests.
--   `swiftformat.sh` - Format the code.
--   `run-debug.sh` - Run AeroSpace.app debug build.
--   `run-cli.sh` - Run `aerospace` in CLI. Arguments are forwarded to `aerospace` binary.
--   `build-docs.sh` - Build the site and man pages to `.site` and `.man` dirs respectively.
--   `build-shell-completion.sh` - Build shell completion to `.shell-completion`.
-    You can test that the completion works properly by sourcing the file `source ./.shell-completion/zsh/_aerospace`
--   `generate.sh` - Regenerate generated project files. `xcode/AeroSpace.xcodeproj` is generated, and some of the source files
-    (the source files have `Generated` suffix in their names).
+The full repository checks use `./test.sh`, which builds, tests, formats, lints, and checks generated files. Run it from a clean checkout with the wrapper dependencies installed. `./generate.sh` regenerates Swift metadata and the Xcode project from `xcode/project.yml`.
 
-**Release build**
--   `build-release.sh` - Build release build to `.release` dir by using Xcode.
--   `install-from-sources.sh` - Build release build from sources and install it as `aerospace-dev` brew cask.
-    This script is "work in progress".
-    Use it on your own risk.
+## Defaults and compatibility
 
-## IDE
+`docs/config-examples/default-config.toml` is the bundled HyprSpace default. The standalone dwindle example provides the same core layout and shortcuts. The refreshed v0.1.0 downloads include this default; earlier downloads must be replaced to get the updated app.
 
--   You can obviously [open the project in Xcode](#xcode).
--   You can use your editor of choice (Neovim, Vim, Emacs, Sublime, VS Code) by using [sourcekit-lsp LSP](https://github.com/apple/sourcekit-lsp).
-    I only tested it in Neovim
--   AppCode. The initial codebase was written in AppCode and the IDE was pretty solid.
-    But AppCode was unfortunately sunsetted, and it started falling apart.
-    Last time I checked it, it didn't support Swift 5.9 features, and I couldn't make it reliably import the project.
-    RIP
+Personal configs remain at `~/.aerospace.toml` or `~/.config/aerospace/aerospace.toml`. Do not overwrite them during installation or upgrades.
 
-## Xcode
+## Releases
 
-Even if you use LSP and another text editor, Xcode is still useful to attach debugger (though you can use `lldb` in CLI).
+From a clean checkout with the build dependencies installed:
 
-1.  To open the project in Xcode: File -> Open -> Choose `Package.swift` file instead of `xcode/AeroSpace.xcodeproj`.
-    It's better to open `Package.swift`, because SPM project is more lightweight.
-    `xcode/AeroSpace.xcodeproj` is only used in `*release*.sh` build scripts.
-2.  After you opened the project in Xcode.
-    Edit Scheme... -> Options -> Console -> Choose `Terminal`.
-    This way Accessibility permission will be requested from Terminal.
-    If you don't change Console to `Terminal`, Accessibility permission will be requested on every rebuild, because the debug binary is unsigned.
+```sh
+./build-release.sh --build-version 0.1.1 --codesign-identity -
+```
 
-## Tips
+This builds universal app and CLI binaries, embeds the version and commit hash, validates signatures, and creates ZIP/DMG downloads plus SHA-256 checksums in `.release`. The DMG includes an Applications shortcut. Temporary generated metadata is restored afterward; unrelated working files are never reset.
 
-- Use built-in "Accessibility Inspector.app" to inspect accessibility properties of windows
-- Use [DeskPad](https://github.com/Stengo/DeskPad) or [BetterDisplay 2](https://github.com/waydabber/BetterDisplay) to emulate several monitors
-- You can use `script/clean-project.sh` to clean the project when something goes wrong.
+`./script/package-dmg.sh --build-version 0.1.1` repackages `.release/HyprSpace.app` after the matching ZIP has been created. `./install-from-sources.sh --dont-rebuild` installs a prepared build and CLI locally without Homebrew.
+
+Tag creation and pushing are manual maintainer actions. Once the annotated release tag is on origin and points at HEAD, `./script/publish-release.sh --build-version 0.1.1` validates and builds the release, then creates a **draft** in `Li-RC/HyprSpace`. Review the assets before publishing. No script pushes Git refs automatically.
+
+## Documentation and assets
+
+`./build-docs.sh` generates the guide and manpages. `./build-shell-completion.sh` generates completion files for the retained `aerospace` command.
+
+Edit `resources/AppIcon.icon` in Icon Composer. Export its default macOS rendition to `resources/Assets.xcassets/AppIcon.appiconset/icon.png` for compatibility, and update `docs/assets/icon.png` for the documentation. Both the Icon Composer document and fallback asset are compiled into app bundles.

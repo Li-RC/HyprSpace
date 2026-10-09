@@ -1,20 +1,18 @@
 == Resources
 
-*Project homepage:* https://github.com/nikitabobko/AeroSpace +
-*Guide:* https://nikitabobko.github.io/AeroSpace/guide +
+*Project homepage:* https://github.com/Li-RC/HyprSpace +
+*Guide:* https://github.com/Li-RC/HyprSpace/blob/main/docs/guide.adoc +
 
 == BUGS
 
-Bugs can be reported to https://github.com/nikitabobko/AeroSpace/discussions/categories/potential-bugs
-
-Maintainers will move verified bugs to https://github.com/nikitabobko/AeroSpace/issues
+Bugs can be reported to https://github.com/Li-RC/HyprSpace/issues
 
 == License
 
 Copyright (C) 2023 Nikita Bobko +
 Free use of this software is granted under the terms of the MIT License +
-You can find the full text of AeroSpace license and its dependencies in the 'legal' directory of the distributed zip archive.
+You can find the full license text and dependency notices in the 'legal' directory of the distributed zip archive.
 
 == AUTHOR
 
-Nikita Bobko and contributors
+HyprSpace contributors, based on AeroSpace by Nikita Bobko and contributors

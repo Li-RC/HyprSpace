@@ -1,7 +1,7 @@
 = aerospace(1)
 include::util/man-attributes.adoc[]
 :manname: aerospace
-:manpurpose: i3-like tiling window manager for macOS
+:manpurpose: macOS tiling window manager with dwindle layouts and window groups
 
 == Synopsis
 [verse]
@@ -9,11 +9,11 @@ aerospace [-h|--help] [-v|--version] <subcommand> [<subcommand-options>...] [<su
 
 == Description
 
-AeroSpace is an i3-like tiling window manager for macOS
+HyprSpace is an macOS tiling window manager with dwindle layouts and window groups
 
-*aerospace* command line program is used to manipulate AeroSpace and query its state.
+*aerospace* command line program is used to manipulate HyprSpace and query its state.
 
-See https://nikitabobko.github.io/AeroSpace/commands for available <subcommand> options
+See https://github.com/Li-RC/HyprSpace/blob/main/docs/commands.adoc for available <subcommand> options
 
 See each <subcommand> individual man page for <subcommand-options> and <subcommand-arguments>
 

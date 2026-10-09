@@ -1,53 +1,43 @@
 #!/usr/bin/env bash
+set -euo pipefail
 cd "$(dirname "$0")/.."
-source ./script/setup.sh
 
 build_version=""
-cask_git_repo_path=""
-site_git_repo_path=""
 while test $# -gt 0; do
     case $1 in
         --build-version) build_version="$2"; shift 2;;
-        --cask-git-repo-path) cask_git_repo_path="$2"; shift 2;;
-        --site-git-repo-path) site_git_repo_path="$2"; shift 2;;
-        *) echo "Unknown option $1"; exit 1;;
+        *) echo "Unknown option: $1" >&2; exit 1;;
     esac
 done
-
 if test -z "$build_version"; then
-    echo "--build-version flag is mandatory" > /dev/stderr
+    echo "--build-version is required" >&2
     exit 1
 fi
 
-if ! test -d "$cask_git_repo_path"; then
-    echo "--cask-git-repo-path is a mandatory flag that must point to existing directory" > /dev/stderr
+# Tag creation and pushing are explicit maintainer actions, never performed here.
+tag="v$build_version"
+test "$(git rev-parse "$tag^{}")" = "$(git rev-parse HEAD)"
+remote_commit=$(git ls-remote origin "refs/tags/$tag^{}" | awk '{print $1}')
+test "$remote_commit" = "$(git rev-parse HEAD)" || {
+    echo "Push the annotated $tag tag to origin before publishing." >&2
     exit 1
-fi
-
-if ! test -d "$site_git_repo_path"; then
-    echo "--site-git-repo-path is a mandatory flag that must point to existing directory" > /dev/stderr
-    exit 1
-fi
-
+}
 ./test.sh
-./build-release.sh --build-version "$build_version"
+./build-release.sh --build-version "$build_version" --codesign-identity -
 
-git tag -a "v$build_version" -m "v$build_version" && git push git@github.com:nikitabobko/AeroSpace.git "v$build_version"
-link="https://github.com/nikitabobko/AeroSpace/releases/new?tag=v$build_version"
-open "$link" || { echo "$link"; exit 1; }
-sleep 1
-open -R "./.release/AeroSpace-v$build_version.zip"
+notes=$(mktemp)
+trap 'rm -f "$notes"' EXIT
+cat > "$notes" <<EOF
+HyprSpace $tag: macOS tiling with dwindle layouts, window groups, and integrated workspace status.
 
-echo "Please upload .zip to GitHub release and hit Enter"
-read -r
+Open the DMG and drag HyprSpace to Applications. The ZIP includes the CLI, manpages, shell completions, and license notices. SHA-256 checksums accompany both downloads.
 
-./script/build-brew-cask.sh \
-    --cask-name aerospace \
-    --zip-uri "https://github.com/nikitabobko/AeroSpace/releases/download/v$build_version/AeroSpace-v$build_version.zip" \
-    --build-version "$build_version"
-
-eval "$cask_git_repo_path/pin.sh"
-cp -r .release/aerospace.rb "$cask_git_repo_path/Casks/aerospace.rb"
-
-rm -rf "${site_git_repo_path:?}/*" # https://www.shellcheck.net/wiki/SC2115
-cp -r .site/* "$site_git_repo_path"
+Universal Apple Silicon and Intel binaries; macOS 13.0 deployment target. Ad-hoc signed and not notarized.
+EOF
+gh release create "$tag" --repo Li-RC/HyprSpace --verify-tag --draft \
+    --title "HyprSpace $tag" --notes-file "$notes" \
+    ".release/HyprSpace-v$build_version.dmg" \
+    ".release/HyprSpace-v$build_version.dmg.sha256" \
+    ".release/HyprSpace-v$build_version.zip" \
+    ".release/HyprSpace-v$build_version.zip.sha256"
+echo "Draft created. Verify the assets before publishing it on GitHub."

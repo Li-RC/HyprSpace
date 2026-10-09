@@ -1,23 +1,21 @@
-name: New Issue
-description: New Issue
+name: Bug report
+description: Report a HyprSpace problem
 body:
-  - type: markdown
-    attributes:
-      value: |
-        AeroSpace project doesn't accept Issues directly. Please prefer GitHub Discussions. See: https://github.com/nikitabobko/AeroSpace/issues/947
-  - type: checkboxes
-    id: checkbox
-    attributes:
-      label: 'Sanity check'
-      options:
-        - label: |
-            I read https://github.com/nikitabobko/AeroSpace/issues/947
-          required: true
   - type: textarea
-    id: body
+    id: reproduction
     attributes:
-      label: Body
-      value: |
-        YOUR ISSUE WILL BE IMMEDIATELY CLOSED BY BOT, DON'T OPEN NEW ISSUES DIRECTLY, USE DISCUSSIONS INSTEAD
+      label: Steps to reproduce
+      description: Include expected and actual behavior.
     validations:
       required: true
+  - type: input
+    id: version
+    attributes:
+      label: HyprSpace and macOS versions
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config and diagnostics
+      description: Include failing shortcuts or window details; remove private information.

@@ -1,11 +1,13 @@
 ====
-AeroSpace is an i3-like tiling window manager for macOS
+HyprSpace is a macOS tiling window manager with dwindle layouts, window groups, and an integrated workspace strip.
 
-*Project homepage*: https://github.com/nikitabobko/AeroSpace
+*Project homepage*: https://github.com/Li-RC/HyprSpace
 
 image:assets/icon.png[300,300,float="right"]
 
-* xref:guide.adoc[AeroSpace Guide]
-* xref:commands.adoc[AeroSpace Commands]
-* xref:goodies.adoc[AeroSpace Goodies]
+* xref:guide.adoc[HyprSpace Guide]
+* xref:commands.adoc[HyprSpace Commands]
+* xref:goodies.adoc[HyprSpace Goodies]
+
+The CLI and config paths retain the `aerospace` name for compatibility. HyprSpace is an independent fork of https://github.com/nikitabobko/AeroSpace[AeroSpace].
 ====

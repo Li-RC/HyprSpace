@@ -39,14 +39,14 @@ struct Main {
             print(
                 """
                 aerospace CLI client version: \(cliClientVersionAndHash)
-                AeroSpace.app server version: \(serverVersionAndHash ?? "Unknown. The server is not responding")
+                HyprSpace.app server version: \(serverVersionAndHash ?? "Unknown. The server is not responding")
                 """,
             )
             if serverVersionAndHash != nil && cliClientVersionAndHash != serverVersionAndHash {
                 eprint(
                     """
                     Warning: AeroSpace client/server versions don't match. Possible fixes:
-                      - Restart AeroSpace.app (server restart is required after each update)
+                      - Restart HyprSpace.app (server restart is required after each update)
                       - Reinstall and restart AeroSpace (corrupted installation)
                     """,
                 )
@@ -74,7 +74,7 @@ struct Main {
             case .customError(let msg):
                 exit(failExitCode, err: msg)
             case .nwError(let e):
-                exit(failExitCode, err: "Can't connect to AeroSpace server. Is AeroSpace.app running?\n\(e.localizedDescription)")
+                exit(failExitCode, err: "Can't connect to HyprSpace server. Is HyprSpace.app running?\n\(e.localizedDescription)")
         }
 
         var stdin = ""
@@ -123,9 +123,9 @@ struct Main {
                 """
                 Warning: AeroSpace client/server versions don't match
                   - aerospace CLI client version: \(cliClientVersionAndHash)
-                  - AeroSpace.app server version: \(ans.serverVersionAndHash)
+                  - HyprSpace.app server version: \(ans.serverVersionAndHash)
                   Possible fixes:
-                  - Restart AeroSpace.app (server restart is required after each update)
+                  - Restart HyprSpace.app (server restart is required after each update)
                   - Reinstall and restart AeroSpace (corrupted installation)
                 """,
             )

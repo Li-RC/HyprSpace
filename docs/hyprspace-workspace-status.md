@@ -2,7 +2,11 @@
 
 HyprSpace includes Workspace Status in its own process, replacing the original AeroSpace menu bar item. Workspace changes update directly from HyprSpace's tree and focus events; workspace switching does not invoke the CLI or poll a separate server.
 
-## Try it
+## Installed app
+
+Launch HyprSpace.app from Applications. The workspace strip is integrated; a separate Workspace Status app is not required. See [the README](../README.md) for DMG installation and configuration.
+
+## Development build
 
 Quit the standalone Workspace Status app and any running HyprSpace/AeroSpace instance, then run from the HyprSpace repository:
 

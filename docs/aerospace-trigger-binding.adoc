@@ -2,7 +2,7 @@
 include::util/man-attributes.adoc[]
 :manname: aerospace-trigger-binding
 // tag::purpose[]
-:manpurpose: Trigger AeroSpace binding as if it was pressed by user
+:manpurpose: Trigger HyprSpace binding as if it was pressed by user
 // end::purpose[]
 
 // =========================================================== Synopsis

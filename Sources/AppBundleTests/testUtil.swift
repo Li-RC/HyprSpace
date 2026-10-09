@@ -17,6 +17,7 @@ let projectRoot: URL = {
 func setUpWorkspacesForTests() {
     config = defaultConfig
     configUrl = defaultConfigUrl
+    config.enableDwindleTiling = false // Tree/layout tests use legacy tiling; dwindle tests opt in explicitly
     config.enableNormalizationFlattenContainers = false // Make layout tests more predictable
     config.enableNormalizationOppositeOrientationForNestedContainers = false // Make layout tests more predictable
     config.defaultRootContainerOrientation = .horizontal // Make default layout predictable

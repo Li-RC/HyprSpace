@@ -1,10 +1,10 @@
 # LICENSE
 
-The AeroSpace itself is licensed under MIT. See [LICENSE](./LICENSE.txt) for the full license text.
+HyprSpace is an AeroSpace fork licensed under MIT. Original copyright and dependency notices are retained. See [LICENSE](./LICENSE.txt) for the full license text.
 
 ## Bundled dependencies and materials
 
-AeroSpace bundles the following dependencies and uses the following materials:
+HyprSpace bundles the following dependencies and uses the following materials:
 
 **HotKey**.
 [HotKey GitHub link](https://github.com/soffes/HotKey).

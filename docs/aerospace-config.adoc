@@ -2,7 +2,7 @@
 include::util/man-attributes.adoc[]
 :manname: aerospace-config
 // tag::purpose[]
-:manpurpose: Query AeroSpace config options
+:manpurpose: Query HyprSpace config options
 // end::purpose[]
 
 // =========================================================== Synopsis

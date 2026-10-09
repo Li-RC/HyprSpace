@@ -1,12 +1,12 @@
 # HyprSpace: dwindle, window groups, and borders
 
-HyprSpace adds opt-in binary tiling, window groups with a member bar, and
+HyprSpace adds binary tiling, window groups with a member bar, and
 configurable focused and inactive window borders. Animations are deferred.
 Executable names and the config search paths still use AeroSpace's names.
 
 Set `enable-dwindle-tiling = true` at the top level of your configuration,
 before any `[table]` headers, or use the supplied standalone sample config.
-It defaults to false.
+The bundled default and refreshed v0.1.0 downloads enable it. Existing personal configs retain their own setting; the original v0.1.0 downloads used the earlier upstream default.
 
 ## Behavior
 
@@ -66,7 +66,7 @@ dropping near its edges creates a separate tile beside the group. Dragging a mem
 to its own group's edge extracts that member.
 `flatten-workspace-tree` dissolves groups in the target workspace.
 
-Borders are disabled by default. To enable them, add this table to your config:
+The underlying option defaults to disabled, but the new bundled HyprSpace config enables borders. To enable them, add this table to your config:
 
 ```toml
 [window-borders]
@@ -93,7 +93,6 @@ is Swift 6.4. The Xcode toolchain installed on this machine can build it directl
 These commands avoid the shell wrappers' separate Bash 5 and swiftly requirements:
 
 ```sh
-cd /Users/liruochong/Documents/HyprSpace
 swift test
 swift build
 ```
@@ -179,6 +178,6 @@ event delivery or shortcut registration rather than the workspace command.
 Send the output and whether the workspace switched. This sample uses Control as its base modifier.
 
 To end the trial, quit the development server from its tray menu (or stop its
-Terminal process) and restart your usual AeroSpace. Your normal config is not
+Terminal process) and restart your installed HyprSpace. Your normal config is not
 changed by this trial. GUI and real-window behavior require these manual checks;
 unit tests alone do not verify application size limits or macOS Accessibility behavior.
