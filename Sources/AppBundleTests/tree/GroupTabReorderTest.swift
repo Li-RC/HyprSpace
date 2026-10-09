@@ -277,4 +277,52 @@ final class GroupTabReorderTest: XCTestCase {
         XCTAssertEqual(control.selectedSegment, 0)
         XCTAssertEqual(focus.windowOrNil, second)
     }
+
+    func testFirstGestureReordersWithoutSelectingTabIncludingControlClickRouting() throws {
+        for controlAtMouseDown in [true, false] {
+            setUpWorkspacesForTests()
+            TrayMenuModel.shared.isEnabled = true
+            let workspace = Workspace.get(byName: name)
+            let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+            let group = first.createWindowGroup()
+            let second = TestWindow.new(id: 2, parent: group)
+            XCTAssertTrue(second.focusWindow())
+            let bar = GroupBarView()
+            bar.frame = NSRect(x: 0, y: 0, width: 300, height: windowGroupBarHeight)
+            let panel = NSPanel(contentRect: bar.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            panel.contentView = bar
+            bar.layoutSubtreeIfNeeded()
+            let view = bar.tabs
+            view.updateGroup(group)
+            bar.applyContrast(.dark)
+            XCTAssertTrue(bar.hitTest(CGPoint(x: 50, y: 16)) === view)
+            func event(_ type: NSEvent.EventType, x: CGFloat, flags: NSEvent.ModifierFlags) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 16), modifierFlags: flags, timestamp: 0,
+                                  windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            if controlAtMouseDown {
+                view.rightMouseDown(with: event(.rightMouseDown, x: 50, flags: [.control]))
+                view.rightMouseDragged(with: event(.rightMouseDragged, x: 250, flags: [.control]))
+            } else {
+                view.mouseDown(with: event(.leftMouseDown, x: 50, flags: []))
+                view.mouseDragged(with: event(.leftMouseDragged, x: 250, flags: [.control]))
+            }
+            XCTAssertEqual(group.children, [second, first])
+            XCTAssertEqual(focus.windowOrNil, second)
+            if #available(macOS 27.0, *) {
+                let movingTabs = view.subviews.compactMap { $0 as? GroupTabView }
+                XCTAssertEqual(movingTabs.count, 2)
+                for tab in movingTabs {
+                    let pill = try XCTUnwrap(tab.glassPill as? NSSegmentedControl)
+                    XCTAssertEqual(pill.role, .tabs)
+                    XCTAssertFalse(pill.isHidden)
+                    XCTAssertEqual(pill.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
+                }
+            }
+            if controlAtMouseDown { view.rightMouseUp(with: event(.rightMouseUp, x: 250, flags: [.control])) }
+            else { view.mouseUp(with: event(.leftMouseUp, x: 250, flags: [.control])) }
+            XCTAssertEqual(group.children, [second, first])
+            panel.close()
+        }
+    }
 }

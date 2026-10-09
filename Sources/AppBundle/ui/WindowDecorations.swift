@@ -87,6 +87,7 @@ func selectGroupTab(windowId: UInt32, in group: TilingContainer) -> Bool {
 final class GroupBarView: NSView {
     let tabs = DecorationView()
     let background: NSView
+    private(set) var contrastScheme: GroupBarContrast?
 
     init() {
         if #available(macOS 26.0, *) {
@@ -120,6 +121,25 @@ final class GroupBarView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func updateContrast(in frame: NSRect) {
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }) else { return }
+        let brightness = GroupBarWallpaper.shared.brightness(in: frame, on: screen)
+        let scheme = brightness.map { GroupBarContrast.choose(brightness: $0, current: contrastScheme) }
+            ?? (AppearanceTheme.current == .dark ? .dark : .light)
+        applyContrast(scheme)
+    }
+
+    func applyContrast(_ scheme: GroupBarContrast) {
+        guard contrastScheme != scheme else { return }
+        contrastScheme = scheme
+        appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        wantsLayer = true
+        layer?.cornerRadius = windowGroupBarHeight / 2
+        layer?.backgroundColor = (scheme == .dark ? NSColor.black : NSColor.white).withAlphaComponent(0.18).cgColor
+    }
 
     override func layout() {
         super.layout()
@@ -251,7 +271,7 @@ final class DecorationView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        guard event.buttonNumber == 0,
+        guard event.buttonNumber == 0 || event.type == .rightMouseDown,
               let index = groupTabIndex(at: point, in: bounds, memberCount: memberIds.count) else { return }
         // Keep keyboard focus in the member window until a click is completed.
         tabDrag = GroupTabDrag(windowId: memberIds[index], origin: point, originalIndex: index,
@@ -262,8 +282,8 @@ final class DecorationView: NSView {
         guard var drag = tabDrag else { return }
         if drag.allowsReordering && !event.modifierFlags.contains(.control) {
             if let group { _ = drag.cancel(in: group) }
-            drag.allowsReordering = false
         }
+        drag.allowsReordering = event.modifierFlags.contains(.control)
         drag.update(at: convert(event.locationInWindow, from: nil), in: bounds, memberCount: memberIds.count)
         tabDrag = drag
         if TrayMenuModel.shared.isEnabled, let group {
@@ -274,7 +294,8 @@ final class DecorationView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { tabDrag = nil; needsDisplay = true }
-        guard event.buttonNumber == 0, let group, var drag = tabDrag else { return }
+        guard event.buttonNumber == 0 || event.type == .rightMouseUp,
+              let group, var drag = tabDrag else { return }
         let point = convert(event.locationInWindow, from: nil)
         drag.update(at: point, in: bounds, memberCount: memberIds.count)
         if drag.isDragging {
@@ -293,6 +314,14 @@ final class DecorationView: NSView {
               memberIds[index] == drag.windowId else { return }
         selectTab(windowId: drag.windowId)
     }
+
+    // macOS can route Control-click through right-button responder methods.
+    override func rightMouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) { mouseDown(with: event) }
+        else { super.rightMouseDown(with: event) }
+    }
+    override func rightMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
+    override func rightMouseUp(with event: NSEvent) { mouseUp(with: event) }
 
     func selectTab(windowId: UInt32) {
         guard let group else { return }
@@ -400,6 +429,7 @@ final class WindowDecorations {
         }
         if let bar = bars[windowId] {
             bar.followOwner(rect, primaryScreenHeight: mainMonitorInfo.height, borderWidth: 0, isGroupBar: true)
+            (bar.contentView as? GroupBarView)?.updateContrast(in: bar.frame)
         }
     }
 
@@ -470,6 +500,7 @@ final class WindowDecorations {
                     let view = material.tabs
                     view.updateGroup(group)
                     bar.setFrame(groupBarFrame(rect, primaryScreenHeight: mainMonitorInfo.height), display: false)
+                    material.updateContrast(in: bar.frame)
                     view.needsDisplay = true
                     bar.orderAboveOwner(window.windowId)
                 }
