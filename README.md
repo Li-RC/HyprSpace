@@ -95,4 +95,4 @@ Report HyprSpace bugs and feature requests in [this repository's issues](https:/
 
 HyprSpace is an independent fork of [AeroSpace by Nikita Bobko and contributors](https://github.com/nikitabobko/AeroSpace). Its dwindle layout and grouping workflows are inspired by [Hyprland](https://github.com/hyprwm/Hyprland); HyprSpace is not an official Hyprland project.
 
-The integrated Workspace Status components retain their [MIT license](legal/workspace-status/LICENSE). See [legal/README.md](legal/README.md) for the project license and bundled dependency notices.
+HyprSpace remains MIT licensed, retaining Nikita Bobko's copyright notice and adding Li Ruochong's notice for HyprSpace modifications. The integrated Workspace Status components retain their [MIT license](legal/workspace-status/LICENSE). See [legal/README.md](legal/README.md) for the project license and bundled dependency notices. These notices are included inside the app bundle as well as in the ZIP distribution.

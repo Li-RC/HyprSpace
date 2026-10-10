@@ -86,12 +86,14 @@ expected_layout=$(cat <<EOF
 .release/HyprSpace.app/Contents/Resources/default-config.toml
 .release/HyprSpace.app/Contents/Resources/AppIcon.icns
 .release/HyprSpace.app/Contents/Resources/Assets.car
+.release/HyprSpace.app/Contents/Resources/LICENSE.txt
+$(find legal | sed 's|^legal|.release/HyprSpace.app/Contents/Resources/legal|')
 .release/HyprSpace.app/Contents/Info.plist
 .release/HyprSpace.app/Contents/PkgInfo
 EOF
 )
 
-if test "$expected_layout" != "$(find .release/HyprSpace.app)"; then
+if test "$(printf '%s\n' "$expected_layout" | sort)" != "$(find .release/HyprSpace.app | sort)"; then
     echo "!!! Expect/Actual layout don't match !!!"
     find .release/HyprSpace.app
     exit 1
@@ -120,6 +122,7 @@ check-contains-hash .release/aerospace
 
 codesign -v .release/HyprSpace.app
 codesign -v .release/aerospace
+./script/check-bundled-licenses.sh .release/HyprSpace.app
 
 ############
 ### PACK ###
@@ -127,6 +130,7 @@ codesign -v .release/aerospace
 
 mkdir -p ".release/HyprSpace-v$build_version/manpage" && cp .man/*.1 ".release/HyprSpace-v$build_version/manpage"
 cp -r ./legal ".release/HyprSpace-v$build_version/legal"
+cp LICENSE.txt ".release/HyprSpace-v$build_version/LICENSE.txt"
 cp -r .shell-completion ".release/HyprSpace-v$build_version/shell-completion"
 cd .release
     mkdir -p "HyprSpace-v$build_version/bin" && cp -r aerospace "HyprSpace-v$build_version/bin"

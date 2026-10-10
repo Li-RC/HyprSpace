@@ -2,6 +2,14 @@
 
 HyprSpace is an AeroSpace fork licensed under MIT. Original copyright and dependency notices are retained. See [LICENSE](./LICENSE.txt) for the full license text.
 
+AeroSpace copyright remains with Nikita Bobko. HyprSpace modifications carry the additional copyright notice for Li Ruochong in the same MIT license. Workspace Status and third-party components retain their respective notices and license terms.
+
+The app includes this directory at `Contents/Resources/legal`, with the canonical license at `Contents/Resources/LICENSE.txt`. ZIP distributions also include `LICENSE.txt` alongside `legal/` so the license symlink resolves in both locations.
+
+**Workspace Status**.
+[Workspace Status MIT license](./workspace-status/LICENSE).
+The integrated workspace strip retains its original license and attribution.
+
 ## Bundled dependencies and materials
 
 HyprSpace bundles the following dependencies and uses the following materials:

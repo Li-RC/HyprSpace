@@ -14,6 +14,7 @@ if test -z "$build_version"; then
     exit 1
 fi
 
+./script/check-bundled-licenses.sh .release/HyprSpace.app
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 ditto .release/HyprSpace.app "$stage/HyprSpace.app"

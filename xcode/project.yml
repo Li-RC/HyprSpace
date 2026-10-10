@@ -41,6 +41,11 @@ targets:
         type: file
         buildPhase: resources
       - "../docs/config-examples/default-config.toml"
+      - path: "../LICENSE.txt"
+        buildPhase: resources
+      - path: "../legal"
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: AeroSpacePackage
         product: AppBundle
