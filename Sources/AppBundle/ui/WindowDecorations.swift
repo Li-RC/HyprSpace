@@ -368,6 +368,9 @@ final class WindowDecorations {
             ownerFrames.removeValue(forKey: windowId)
             pendingOwners.removeValue(forKey: windowId)
             updateObservedOwners(observedOwners.subtracting([windowId]))
+            // Cmd-W need not generate a usable AX destruction notification.
+            // Reconcile the group when WindowServer closes or orders out its owner.
+            scheduleCancellableCompleteRefreshSession(.ax(kAXUIElementDestroyedNotification))
             return
         }
         if event == 807 && isLeftMouseButtonDown { recordWindowMouseResize(windowId) }

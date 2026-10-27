@@ -1,5 +1,22 @@
 import Common
 
+extension TilingContainer {
+    @MainActor
+    func restoreVisibleMemberAfterClosing(_ closedWindow: Window) {
+        guard isWindowGroup, let active = mostRecentWindowRecursive,
+              let rect = closedWindow.lastAppliedLayoutPhysicalRect else { return }
+        // Restore the replacement before nativeFocus raises it. A close-triggered
+        // focus notification can cancel the refresh before its final layout pass.
+        if let window = active as? MacWindow {
+            window.unhideFromCorner()
+            window.skipNextTilingAnimation = true
+        }
+        active.lastAppliedLayoutPhysicalRect = rect
+        active.lastAppliedLayoutVirtualRect = closedWindow.lastAppliedLayoutVirtualRect
+        active.setTilingFrame(rect.topLeftCorner, rect.size)
+    }
+}
+
 extension Window {
     var windowGroup: TilingContainer? {
         guard let parent = parent as? TilingContainer, parent.isWindowGroup else { return nil }

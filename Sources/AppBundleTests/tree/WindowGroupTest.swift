@@ -69,6 +69,26 @@ final class WindowGroupTest: XCTestCase {
         XCTAssertNil(next.windowGroup)
     }
 
+    func testClosingActiveMemberRestoresReplacementBeforeNextLayout() async throws {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let group = first.createWindowGroup()
+        let closing = TestWindow.new(id: 2, parent: group)
+        XCTAssertTrue(closing.focusWindow())
+        try await workspace.layoutWorkspace()
+        let rect = try XCTUnwrap(closing.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(first.appliedFrames, 0)
+
+        closing.unbindFromParent()
+        group.restoreVisibleMemberAfterClosing(closing)
+
+        XCTAssertEqual(group.mostRecentWindowRecursive, first)
+        XCTAssertFalse(first.isInactiveGroupMember)
+        XCTAssertEqual(first.appliedFrames, 1)
+        XCTAssertEqual(first.lastAppliedLayoutPhysicalRect?.topLeftCorner, rect.topLeftCorner)
+        XCTAssertEqual(first.lastAppliedLayoutPhysicalRect?.size, rect.size)
+    }
+
     func testMergeGroupsKeepsMembersAndFocusedWindow() async {
         let workspace = Workspace.get(byName: name)
         let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
